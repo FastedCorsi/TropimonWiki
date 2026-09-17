@@ -1,14 +1,16 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.1
+By FastedCorsi — 0.1.2
 
-**F7** : Pokédex Wiki (touche reconfigurable).
+**F7** : Tropimon Wiki (touche reconfigurable).
+
+Fenêtre compacte centrée, limitée à 80 % de la largeur et 78 % de la hauteur, sans agrandissement au-delà de son échelle native. Titre Tropimon Wiki, pied de page dégagé et navigation des formes seulement lorsqu'il en existe plusieurs. Position de lecture conservée au redimensionnement.
 
 Interface au style Cobblemon / Tropimon : cadre vert du Pokédex Cobblemon, panneaux turquoise, accents sable, icônes de types natives, boutons au survol et jauges de statistiques. Flèches pour parcourir les formes dans les deux sens, indicateurs de défilement et bouton de fermeture. Les textures sont chargées depuis Cobblemon, sans être redistribuées.
 
 Recherche par nom traduit, nom technique ou numéro national ; modèle 3D, formes et types. Six fiches : description/statistiques/EV, talents, attaques et sources d'apprentissage, évolutions, élevage et butin. Molette dans la liste ou les détails ; flèches haut/bas pour parcourir les espèces.
 
-Les informations proviennent du registre Cobblemon chargé. Une fiche n'implique pas qu'un système d'élevage, une CT ou un butin soit effectivement activé sur le serveur. Les conditions avancées d'évolution conservent leur représentation technique lorsque aucune présentation fiable n'est disponible. Pas de suggestions de combat ni de calculateur.
+Les informations proviennent du registre Cobblemon chargé. Une fiche n'implique pas qu'un système d'élevage, une CT ou un butin soit effectivement activé sur le serveur. Si les évolutions ne sont pas transmises au client, la fiche indique que ces données sont indisponibles, sans conclure à une absence d'évolution. Les conditions avancées d'évolution conservent leur représentation technique lorsque aucune présentation fiable n'est disponible. Pas de suggestions de combat ni de calculateur.
 
 ## Compilation et vérification
 
@@ -25,7 +27,7 @@ Le build local exige un unique JAR Cobblemon actif. `TROPIMON_HOME` permet de ch
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.1/local` et `build/release/0.1.1/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. Le script du dossier local attend l'arrêt de Minecraft, vérifie les empreintes, conserve l'ancien JAR hors des mods et refuse une cible modifiée depuis la préparation. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.2/local` et `build/release/0.1.2/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. Le script du dossier local attend l'arrêt de Minecraft, vérifie les empreintes, conserve l'ancien JAR hors des mods et refuse une cible modifiée depuis la préparation. Le launcher peut rester ouvert.
 
 L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Vérification asynchrone au démarrage, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 

@@ -53,6 +53,8 @@ public final class WikiScreen extends InstrumentScreen {
   protected void init() {
     super.init();
     String old = search == null ? "" : search.getText();
+    int previousListOffset = listOffset;
+    boolean wasFocused = search != null && search.isFocused();
     search =
         new TextFieldWidget(textRenderer, 34, 68, 139, 12, Text.literal("Rechercher un Pokémon"));
     search.setDrawsBackground(false);
@@ -62,6 +64,8 @@ public final class WikiScreen extends InstrumentScreen {
     search.setChangedListener(this::filter);
     search.setText(old);
     filter(old);
+    listOffset = Math.clamp(previousListOffset, 0, Math.max(0, filtered.size() - 11));
+    search.setFocused(wasFocused);
     updatePortrait();
   }
 
@@ -192,8 +196,11 @@ public final class WikiScreen extends InstrumentScreen {
                 + " n'est ajouté.");
       }
       case 3 -> {
-        if (form.getEvolutions().isEmpty())
-          paragraph("Aucune évolution renseignée pour cette forme.");
+        if (form.getEvolutions().isEmpty()) {
+          paragraph("Données d'évolution indisponibles dans le registre client.");
+          paragraph("Cela ne signifie pas que ce Pokémon ne peut pas évoluer.");
+          break;
+        }
         for (var evolution : form.getEvolutions()) {
           paragraph("→ " + evolution.getResult().asString(" "));
           for (var requirement : evolution.getRequirements()) {
@@ -271,7 +278,7 @@ public final class WikiScreen extends InstrumentScreen {
   @Override
   public void render(DrawContext c, int mouseX, int mouseY, float delta) {
     int mx = localX(mouseX), my = localY(mouseY);
-    begin(c, ACCENT, "TROPIMON  /  POKÉDEX", "Wiki · données Cobblemon");
+    begin(c, ACCENT, "Tropimon Wiki", "Données Cobblemon");
     chip(c, "×", 512, 20, 20, false, hit(mx, my, 512, 20, 20, 21), ACCENT);
     c.fill(27, 54, 186, 309, INK);
     c.fill(30, 63, 181, 84, search.isFocused() ? ACCENT : 0xFF6FA88C);
@@ -307,15 +314,23 @@ public final class WikiScreen extends InstrumentScreen {
       for (var type : form.getTypes()) {
         c.fill(323, typeY, 441, typeY + 21, INK);
         c.fill(323, typeY + 19, 441, typeY + 21, 0xFF000000 | type.getPrimaryColor());
-        label(c, type.getDisplayName().getString(), 348, typeY + 7, WHITE);
+        label(c, textRenderer.trimToWidth(type.getDisplayName().getString(), 87), 348, typeY + 7, WHITE);
         typeY += 25;
       }
       typeIcons.forEach(icon -> icon.render(c));
-      label(c, "FORME  " + (formIndex + 1) + " / " + forms.size(), 323, 148, WHITE);
-      chip(c, "‹", 323, 163, 21, false, hit(mx, my, 323, 163, 21, 21), ACCENT);
-      chip(c, form == selected.getStandardForm() ? "Standard" : form.getName(),
-          347, 163, 151, false, hit(mx, my, 347, 163, 151, 21), ACCENT);
-      chip(c, "›", 501, 163, 22, false, hit(mx, my, 501, 163, 22, 21), ACCENT);
+      boolean multipleForms = forms.size() > 1;
+      label(c, multipleForms ? "FORME  " + (formIndex + 1) + " / " + forms.size() : "FORME",
+          323, 148, MUTED);
+      int formX = multipleForms ? 347 : 323;
+      int formWidth = multipleForms ? 151 : 200;
+      c.fill(formX, 163, formX + formWidth, 184, PANEL);
+      String formName = textRenderer.trimToWidth(
+          form == selected.getStandardForm() ? "Standard" : form.getName(), formWidth - 12);
+      label(c, formName, formX + (formWidth - textRenderer.getWidth(formName)) / 2, 170, WHITE);
+      if (multipleForms) {
+        chip(c, "‹", 323, 163, 21, false, hit(mx, my, 323, 163, 21, 21), ACCENT);
+        chip(c, "›", 501, 163, 22, false, hit(mx, my, 501, 163, 22, 21), ACCENT);
+      }
       for (int i = 0; i < TABS.length; i++)
         chip(c, TABS[i], 199 + i * 56, 195, 54, i == tab,
             hit(mx, my, 199 + i * 56, 195, 54, 21), ACCENT);
@@ -333,8 +348,9 @@ public final class WikiScreen extends InstrumentScreen {
         label(c, lines.get(index), 207, y, INK);
       }
       scrollbar(c, 528, 224, 79, detailOffset, lines.size(), 7);
-      label(c, (detailOffset + 1) + " / " + Math.max(1, lines.size()) + " · molette dans la fiche",
-          209, 311, MUTED);
+      if (lines.size() > 7)
+        label(c, "Lignes " + (detailOffset + 1) + "–" + Math.min(detailOffset + 7, lines.size())
+            + " / " + lines.size(), 209, 315, MUTED);
     }
     end(c);
     // ModelWidget scissors use screen coordinates rather than the outer UI transform.
@@ -359,14 +375,15 @@ public final class WikiScreen extends InstrumentScreen {
       if (i < filtered.size()) select(filtered.get(i));
       return true;
     }
-    if (selected != null && hit(mx, my, 323, 163, 200, 21)) {
+    if (selected != null && forms.size() > 1
+        && (hit(mx, my, 323, 163, 21, 21) || hit(mx, my, 501, 163, 22, 21))) {
       formIndex = Math.floorMod(formIndex + (mx < 344 ? -1 : 1), forms.size());
       form = forms.get(formIndex);
       updatePortrait();
       rebuild();
       return true;
     }
-    if (selected != null && hit(mx, my, 199, 195, 334, 21)) {
+    if (selected != null && hit(mx, my, 199, 195, 334, 21) && (mx - 199) % 56 < 54) {
       tab = Math.min(5, (mx - 199) / 56);
       rebuild();
       return true;

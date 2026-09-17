@@ -4,7 +4,8 @@ param(
     [string]$CobblemonJar,
     [ValidateRange(960, 3840)][int]$Width = 1400,
     [ValidateRange(600, 2160)][int]$Height = 900,
-    [ValidateSet('fr_fr', 'en_us')][string]$Language = 'fr_fr'
+    [ValidateSet('fr_fr', 'en_us')][string]$Language = 'fr_fr',
+    [ValidateRange(1, 4)][int]$GuiScale = 2
 )
 # Import the engine's built-in modules explicitly, including when launched by a build daemon.
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -ErrorAction Stop
@@ -64,7 +65,7 @@ $java = Join-Path $launcher 'runtime/x64/jdk-21.0.6+7/bin/java.exe'
 $optionsPath = Join-Path $run 'options.txt'
 $optionsLines = if (Test-Path -LiteralPath $optionsPath) { @(Get-Content -LiteralPath $optionsPath | Where-Object { $_ -notmatch '^lang:' }) } else { @() }
 [IO.File]::WriteAllLines($optionsPath, [string[]]($optionsLines + "lang:$Language"), [Text.UTF8Encoding]::new($false))
-$arguments = @('-Xmx3G', '-Dtropimon.smoke=true', '-Dfabric.debug.disableErrorGui=true', "-Dtropimon.smoke.language=$Language", '-Dfabric.log.disableAnsi=true',
+$arguments = @('-Xmx3G', '-Dtropimon.smoke=true', '-Dfabric.debug.disableErrorGui=true', "-Dtropimon.smoke.language=$Language", "-Dtropimon.smoke.guiScale=$GuiScale", '-Dfabric.log.disableAnsi=true',
     "-Djava.library.path=$(Join-Path $launcher 'natives')",
     '-cp', ($classpath -join ';'), $loader.mainClass,
     '--username', 'InstrumentTest', '--uuid', '00000000000000000000000000000001',

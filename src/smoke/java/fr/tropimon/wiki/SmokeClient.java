@@ -37,7 +37,7 @@ public final class SmokeClient implements ClientModInitializer {
                 stage = 0;
                 ticks = 0;
                 client.options.getViewDistance().setValue(2);
-                client.options.getGuiScale().setValue(2);
+                client.options.getGuiScale().setValue(Integer.getInteger("tropimon.smoke.guiScale", 2));
                 client.options.pauseOnLostFocus = false;
                 client
                     .getTutorialManager()
@@ -67,6 +67,10 @@ public final class SmokeClient implements ClientModInitializer {
                 client.getToastManager().clear();
                 screen = new WikiScreen();
                 client.setScreen(screen);
+                var wiki = (WikiScreen) screen;
+                require(wiki.scale <= 1F && InstrumentScreen.H * wiki.scale <= screen.height * 0.781F,
+                    "compact window keeps vertical margins");
+                require(screen.getTitle().getString().equals("Tropimon Wiki"), "Wiki product title");
                 require(
                     ((List<?>) field(screen, "all")).size() > 1000, "species registry populated");
                 stage = 1;
@@ -88,6 +92,8 @@ public final class SmokeClient implements ClientModInitializer {
                 require(field(screen, "selected") == null, "empty search clears selection");
                 require(field(screen, "portrait") == null, "empty search clears portrait");
                 search.setText("#1");
+                click(512, 173);
+                require((int) field(screen, "formIndex") == 0, "single form has no active arrow");
                 click(211, 201);
                 scroll(400, 265, -1);
                 require((int) field(screen, "detailOffset") > 0, "scaled details scroll");
@@ -127,9 +133,32 @@ public final class SmokeClient implements ClientModInitializer {
                 shot(client, "wiki-form");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                int selectedForm = (int) field(screen, "formIndex");
+                scroll(400, 265, -1);
+                int detail = (int) field(screen, "detailOffset");
+                screen.resize(client, screen.width, screen.height);
+                require((int) field(screen, "formIndex") == selectedForm
+                    && (int) field(screen, "detailOffset") == detail, "resize preserves form and details");
+                search = (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                search.setText("#14");
+                click(378, 203);
+                var form = (com.cobblemon.mod.common.pokemon.FormData) field(screen, "form");
+                if (form.getEvolutions().isEmpty())
+                  require(((List<?>) field(screen, "lines")).stream()
+                      .anyMatch(line -> line.toString().contains("indisponibles")),
+                      "missing evolution data is described as unavailable");
+                stage = 5;
+                ticks = 0;
+              }
+              case 5 -> {
+                shot(client, "wiki-evolution");
+                var search =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
                 search.setText("");
                 scroll(90, 170, -1);
                 require((int) field(screen, "listOffset") == 3, "species list scroll");
+                screen.resize(client, screen.width, screen.height);
+                require((int) field(screen, "listOffset") == 3, "resize preserves list position");
                 click(520, 30);
                 require(client.currentScreen == null, "scaled close button");
                 done(client);

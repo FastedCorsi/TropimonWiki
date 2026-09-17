@@ -24,17 +24,18 @@ abstract class InstrumentScreen extends Screen {
 
   @Override
   protected void init() {
-    scale = Math.min(1.5F, Math.min((width - 12F) / W, (height - 12F) / H));
+    // Keep visible space around the Wiki, including at large Minecraft GUI scales.
+    scale = Math.min(1F, Math.min(width * 0.80F / W, height * 0.78F / H));
     left = (int) ((width - W * scale) / 2);
     top = (int) ((height - H * scale) / 2);
   }
 
   protected int localX(double x) {
-    return (int) ((x - left) / scale);
+    return (int) Math.floor((x - left) / scale);
   }
 
   protected int localY(double y) {
-    return (int) ((y - top) / scale);
+    return (int) Math.floor((y - top) / scale);
   }
 
   protected void begin(DrawContext c, int accent, String label, String subtitle) {
@@ -49,8 +50,9 @@ abstract class InstrumentScreen extends Screen {
     c.fill(29, 19, 31, 41, accent);
     label(c, label, 40, 20, WHITE);
     label(c, subtitle, 40, 34, MUTED);
-    label(c, "By FastedCorsi", 28, H - 20, WHITE);
-    label(c, "ÉCHAP · FERMER", W - 116, H - 20, WHITE);
+    c.fill(27, 311, W - 27, 326, INK);
+    label(c, "By FastedCorsi", 34, 315, MUTED);
+    label(c, "Échap · Fermer", W - 116, 315, MUTED);
   }
 
   protected void end(DrawContext c) {
