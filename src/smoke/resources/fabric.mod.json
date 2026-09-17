@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "wiki_smoke",
+  "version": "1.0.0",
+  "authors": [
+    "By FastedCorsi"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "fr.tropimon.wiki.SmokeClient"
+    ]
+  },
+  "depends": {
+    "tropimon_wiki": "*"
+  }
+}

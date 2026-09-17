@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "tropimon_wiki",
+  "version": "${version}",
+  "name": "Tropimon Wiki",
+  "description": "By FastedCorsi — Wiki autonome pour Tropimon.",
+  "authors": [
+    "By FastedCorsi"
+  ],
+  "contact": {
+    "sources": "https://github.com/FastedCorsi/TropimonWiki"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "fr.tropimon.wiki.WikiClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*",
+    "cobblemon": ">=1.8.0"
+  }
+}
