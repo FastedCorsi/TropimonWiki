@@ -1,8 +1,10 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.0
+By FastedCorsi — 0.1.1
 
 **F7** : Pokédex Wiki (touche reconfigurable).
+
+Interface au style Cobblemon / Tropimon : cadre vert du Pokédex Cobblemon, panneaux turquoise, accents sable, icônes de types natives, boutons au survol et jauges de statistiques. Flèches pour parcourir les formes dans les deux sens, indicateurs de défilement et bouton de fermeture. Les textures sont chargées depuis Cobblemon, sans être redistribuées.
 
 Recherche par nom traduit, nom technique ou numéro national ; modèle 3D, formes et types. Six fiches : description/statistiques/EV, talents, attaques et sources d'apprentissage, évolutions, élevage et butin. Molette dans la liste ou les détails ; flèches haut/bas pour parcourir les espèces.
 
@@ -23,7 +25,7 @@ Le build local exige un unique JAR Cobblemon actif. `TROPIMON_HOME` permet de ch
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.0/local` et `build/release/0.1.0/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. Le script du dossier local attend l'arrêt de Minecraft, vérifie les empreintes, conserve l'ancien JAR hors des mods et refuse une cible modifiée depuis la préparation. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.1/local` et `build/release/0.1.1/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. Le script du dossier local attend l'arrêt de Minecraft, vérifie les empreintes, conserve l'ancien JAR hors des mods et refuse une cible modifiée depuis la préparation. Le launcher peut rester ouvert.
 
 L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Vérification asynchrone au démarrage, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 

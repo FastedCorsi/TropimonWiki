@@ -64,6 +64,7 @@ public final class SmokeClient implements ClientModInitializer {
               }
               case 0 -> {
                 if (client.player == null) return;
+                client.getToastManager().clear();
                 screen = new WikiScreen();
                 client.setScreen(screen);
                 require(
@@ -75,24 +76,62 @@ public final class SmokeClient implements ClientModInitializer {
                 shot(client, "wiki");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                click(40, 70);
+                require(search.isFocused(), "scaled search field accepts focus");
                 search.setText("eevee");
                 require(
                     ((List<?>) field(screen, "filtered")).size() == 1,
                     "English identifier search with French translation");
-                search.setText("");
-                var tab = screen.getClass().getDeclaredField("tab");
-                tab.setAccessible(true);
-                tab.setInt(screen, 2);
-                var rebuild = screen.getClass().getDeclaredMethod("rebuild");
-                rebuild.setAccessible(true);
-                rebuild.invoke(screen);
-                require(
-                    ((List<?>) field(screen, "lines")).size() > 10, "learnset details populated");
+                search.setText("#133");
+                require(((List<?>) field(screen, "filtered")).size() == 1, "national number search");
+                search.setText("no-such-pokemon");
+                require(field(screen, "selected") == null, "empty search clears selection");
+                require(field(screen, "portrait") == null, "empty search clears portrait");
+                search.setText("#1");
+                click(211, 201);
+                scroll(400, 265, -1);
+                require((int) field(screen, "detailOffset") > 0, "scaled details scroll");
                 stage = 2;
                 ticks = 0;
               }
               case 2 -> {
+                shot(client, "wiki-stats");
+                for (int i = 0; i < 6; i++) {
+                  click(210 + i * 56, 203);
+                  require((int) field(screen, "tab") == i, "scaled tab " + i);
+                  require(!((List<?>) field(screen, "lines")).isEmpty(), "tab content " + i);
+                }
+                click(322, 203);
+                require(
+                    ((List<?>) field(screen, "lines")).size() > 10, "learnset details populated");
+                stage = 3;
+                ticks = 0;
+              }
+              case 3 -> {
                 shot(client, "wiki-moves");
+                var search =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                search.setText("#26");
+                int count = ((List<?>) field(screen, "forms")).size();
+                require(count > 1, "regional forms populated");
+                click(512, 173);
+                require((int) field(screen, "formIndex") == 1, "next form");
+                click(333, 173);
+                require((int) field(screen, "formIndex") == 0, "previous form");
+                click(333, 173);
+                require((int) field(screen, "formIndex") == count - 1, "previous form wraps");
+                stage = 4;
+                ticks = 0;
+              }
+              case 4 -> {
+                shot(client, "wiki-form");
+                var search =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                search.setText("");
+                scroll(90, 170, -1);
+                require((int) field(screen, "listOffset") == 3, "species list scroll");
+                click(520, 30);
+                require(client.currentScreen == null, "scaled close button");
                 done(client);
               }
             }
@@ -103,6 +142,18 @@ public final class SmokeClient implements ClientModInitializer {
             stage = 99;
           }
         });
+  }
+
+  void click(int x, int y) {
+    var wiki = (WikiScreen) screen;
+    screen.mouseClicked(wiki.left + (x + 0.5) * wiki.scale,
+        wiki.top + (y + 0.5) * wiki.scale, 0);
+  }
+
+  void scroll(int x, int y, double amount) {
+    var wiki = (WikiScreen) screen;
+    screen.mouseScrolled(wiki.left + (x + 0.5) * wiki.scale,
+        wiki.top + (y + 0.5) * wiki.scale, 0, amount);
   }
 
   static Object field(Object instance, String name) throws Exception {
