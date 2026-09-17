@@ -1,5 +1,12 @@
 # Confidentialité permanente des mods Tropimon
 
+## Instance du launcher et données du Wiki
+
+- Le programme du launcher et ses données peuvent être séparés. Détecter le profil actif avant une installation ; le dossier mods historique peut être un miroir et ne prouve pas quels JAR sont chargés.
+- À l'exécution, utiliser l'origine du ModContainer Fabric pour identifier le JAR chargé et dériver son dossier mods et son instance. Vérifier le JAR et son SHA-256 dans cette instance avant d'annoncer une installation réussie.
+- Classer les talents à partir de leur statut explicite, jamais de leur ordre ou de leur nombre. Un talent unique, y compris un doublon normal/caché de même nom, ne doit pas être présenté comme un HA distinct.
+- Présenter les évolutions avec leur méthode et toutes leurs conditions. Si une référence locale supplée des données absentes du client, distinguer clairement cette référence des règles réellement transmises par le serveur ; conserver les conditions inconnues plutôt que de les ignorer.
+
 Cette règle demandée par l'utilisateur s'applique à toute création, correction, optimisation, compilation et livraison des mods Tropimon de ce dépôt, y compris leurs futurs modules.
 
 ## Attribution et données du développeur

@@ -63,6 +63,20 @@ function Game-Running([string]$Instance) {
     return $false
 }
 
+function Resolve-Instance([string]$Root) {
+    $base = (Resolve-Path -LiteralPath $Root).Path
+    $profiles = Join-Path $base 'profiles'
+    if (!(Test-Path -LiteralPath $profiles -PathType Container)) { return $base }
+    $candidates = @(Get-ChildItem -LiteralPath $profiles -Directory | ForEach-Object {
+        $path = Join-Path $_.FullName 'instance'
+        if (Test-Path -LiteralPath (Join-Path $path 'mods') -PathType Container) { $path }
+    })
+    $active = @($candidates | Where-Object { Game-Running $_ })
+    if ($active.Count -eq 1) { return $active[0] }
+    if ($active.Count -eq 0 -and $candidates.Count -eq 1) { return $candidates[0] }
+    throw 'Profil actif ambigu ; indiquer explicitement son dossier instance.'
+}
+
 try {
     $sources = @(Get-ChildItem -LiteralPath $deliveryRoot -Filter ($filePrefix + '-*-LOCAL.jar') -File)
     if ($sources.Count -ne 1) { throw 'Un seul JAR local est attendu.' }
@@ -78,7 +92,7 @@ try {
         throw 'Identité ou attribution du JAR invalide.'
     }
 
-    $root = (Resolve-Path -LiteralPath $LauncherRoot).Path
+    $root = Resolve-Instance $LauncherRoot
     $mods = (Resolve-Path -LiteralPath (Join-Path $root 'mods')).Path
     if ([IO.Path]::GetDirectoryName($mods) -ine $root) { throw 'Dossier mods hors de l''instance choisie.' }
     foreach ($directory in @($root, $mods)) {
@@ -99,6 +113,7 @@ try {
         Write-Status 'waiting' 'Minecraft utilise encore cette instance.'
         Start-Sleep -Seconds ([Math]::Max(2, $PollSeconds))
     }
+    if ((Resolve-Instance $LauncherRoot) -ine $root) { throw 'Le profil actif a changé.' }
 
     $installed = @(Get-ChildItem -LiteralPath $mods -Filter '*.jar' -File | Where-Object {
         try { (Read-Manifest $_.FullName).id -ceq $modId } catch { $false }

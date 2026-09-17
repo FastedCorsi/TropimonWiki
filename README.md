@@ -1,6 +1,6 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.2
+By FastedCorsi — 0.1.3
 
 **F7** : Tropimon Wiki (touche reconfigurable).
 
@@ -8,9 +8,9 @@ Fenêtre compacte centrée, limitée à 80 % de la largeur et 78 % de la hauteur
 
 Interface au style Cobblemon / Tropimon : cadre vert du Pokédex Cobblemon, panneaux turquoise, accents sable, icônes de types natives, boutons au survol et jauges de statistiques. Flèches pour parcourir les formes dans les deux sens, indicateurs de défilement et bouton de fermeture. Les textures sont chargées depuis Cobblemon, sans être redistribuées.
 
-Recherche par nom traduit, nom technique ou numéro national ; modèle 3D, formes et types. Six fiches : description/statistiques/EV, talents, attaques et sources d'apprentissage, évolutions, élevage et butin. Molette dans la liste ou les détails ; flèches haut/bas pour parcourir les espèces.
+Recherche par nom traduit, nom technique ou numéro national ; modèle 3D, formes et types. Sept fiches : profil, statistiques/EV, talents, attaques et sources d'apprentissage, évolutions, élevage et butin. Les six statistiques sont visibles ensemble. Les talents normaux et HA distincts apparaissent à droite du modèle ; un clic ouvre leur description. Un talent unique et ses éventuels doublons ne sont pas présentés comme un HA distinct. Molette dans la liste ou les détails ; flèches haut/bas pour parcourir les espèces.
 
-Les informations proviennent du registre Cobblemon chargé. Une fiche n'implique pas qu'un système d'élevage, une CT ou un butin soit effectivement activé sur le serveur. Si les évolutions ne sont pas transmises au client, la fiche indique que ces données sont indisponibles, sans conclure à une absence d'évolution. Les conditions avancées d'évolution conservent leur représentation technique lorsque aucune présentation fiable n'est disponible. Pas de suggestions de combat ni de calculateur.
+Les informations proviennent du registre Cobblemon chargé. Les traductions françaises installées sont privilégiées, avec repli sur la langue chargée si une clé est absente. Une fiche n'implique pas qu'un système d'élevage, une CT ou un butin soit effectivement activé sur le serveur. Si les évolutions ne sont pas transmises au client, le Wiki lit les définitions du mod Cobblemon réellement chargé, pour l'espèce et la forme sélectionnées. Cette référence locale est explicitement identifiée et peut différer du serveur ou des extensions. Les destinations, niveaux, pierres, échanges, amitié, moments et autres conditions connues sont présentés en français. Les conditions avancées inconnues restent visibles avec leurs paramètres, sans être omises. Pas de suggestions de combat ni de calculateur.
 
 ## Compilation et vérification
 
@@ -23,11 +23,11 @@ gradlew build -PofficialDependenciesOnly
 gradlew prepareReleaseDelivery
 ```
 
-Le build local exige un unique JAR Cobblemon actif. `TROPIMON_HOME` permet de choisir une instance ; la matrice utilise `-PcobblemonJar`. Un exemple de CI utilisant le minimum officiel est fourni sous tools ; aucun workflow distant n'est activé dans cette livraison. Tests unitaires, contrôle de confidentialité des sources et des JAR (archives imbriquées comprises), tests d'installation sous Windows, puis test hors ligne isolé avec `tools/VerifyClient.ps1`. Aucun journal, sauvegarde ou profil réel n'est publié.
+Le build local identifie l'unique JAR Cobblemon par fabric.mod.json, même si son nom est une empreinte. Il sélectionne l'unique profil disponible ; en présence de plusieurs profils, choisir explicitement l'instance active avec TROPIMON_HOME. `TROPIMON_HOME` permet de choisir une instance ; la matrice utilise `-PcobblemonJar`. Un exemple de CI utilisant le minimum officiel est fourni sous tools ; aucun workflow distant n'est activé dans cette livraison. Tests unitaires, contrôle de confidentialité des sources et des JAR (archives imbriquées comprises), tests d'installation sous Windows, puis test hors ligne isolé avec `tools/VerifyClient.ps1`. Aucun journal, sauvegarde ou profil réel n'est publié.
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.2/local` et `build/release/0.1.2/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. Le script du dossier local attend l'arrêt de Minecraft, vérifie les empreintes, conserve l'ancien JAR hors des mods et refuse une cible modifiée depuis la préparation. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.3/local` et `build/release/0.1.3/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. Le script du dossier local détecte et vérifie le profil actif, préserve le miroir historique et attend l'arrêt de Minecraft, vérifie les empreintes, conserve l'ancien JAR hors des mods et refuse une cible modifiée depuis la préparation. Le launcher peut rester ouvert.
 
 L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Vérification asynchrone au démarrage, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 

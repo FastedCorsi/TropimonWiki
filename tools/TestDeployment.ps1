@@ -46,4 +46,21 @@ $state=Get-Content -LiteralPath (Join-Path $delivery 'install-status.json') -Raw
 if($state.state -ne 'blocked'){throw 'Concurrent target modification was not blocked'}
 if((Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash -eq $hash){throw 'Changed target was overwritten'}
 Write-Output 'Deployment tests passed: install, backup, corruption and changed-target rejection.'
+function Get-CimInstance { @() }
+$profileRoot = Join-Path $fixture 'profile-launcher'
+$profileInstance = Join-Path $profileRoot 'profiles/stable/instance'
+New-Item -ItemType Directory -Path (Join-Path $profileRoot 'mods'),(Join-Path $profileInstance 'mods') -Force | Out-Null
+$mirror = Join-Path $profileRoot 'mods/launcher-mirror.jar'
+Copy-Item -LiteralPath $Jar -Destination $mirror
+& $script -LauncherRoot $profileRoot
+$state = Get-Content -LiteralPath (Join-Path $delivery 'install-status.json') -Raw | ConvertFrom-Json
+if ($state.state -ne 'installed') { throw 'Active profile installation failed' }
+$profileJar = Join-Path $profileInstance ('mods/' + (Split-Path $source -Leaf))
+if ((Get-FileHash -LiteralPath $profileJar).Hash -ne $hash) { throw 'Active profile hash mismatch' }
+if ((Get-FileHash -LiteralPath $mirror).Hash -ne $hash) { throw 'Launcher mirror changed' }
+New-Item -ItemType Directory -Path (Join-Path $profileRoot 'profiles/preview/instance/mods') -Force | Out-Null
+& $script -LauncherRoot $profileRoot
+$state = Get-Content -LiteralPath (Join-Path $delivery 'install-status.json') -Raw | ConvertFrom-Json
+if ($state.state -ne 'blocked') { throw 'Ambiguous profile was accepted' }
+Write-Output 'Profile tests passed: active instance, mirror preservation, ambiguous profile rejection.'
 # Keep synthetic fixtures in the OS temporary directory; never publish them.

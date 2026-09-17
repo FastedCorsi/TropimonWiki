@@ -37,7 +37,10 @@ public final class SmokeClient implements ClientModInitializer {
                 stage = 0;
                 ticks = 0;
                 client.options.getViewDistance().setValue(2);
-                client.options.getGuiScale().setValue(Integer.getInteger("tropimon.smoke.guiScale", 2));
+                client
+                    .options
+                    .getGuiScale()
+                    .setValue(Integer.getInteger("tropimon.smoke.guiScale", 2));
                 client.options.pauseOnLostFocus = false;
                 client
                     .getTutorialManager()
@@ -68,90 +71,155 @@ public final class SmokeClient implements ClientModInitializer {
                 screen = new WikiScreen();
                 client.setScreen(screen);
                 var wiki = (WikiScreen) screen;
-                require(wiki.scale <= 1F && InstrumentScreen.H * wiki.scale <= screen.height * 0.781F,
+                require(
+                    wiki.scale <= 1F && InstrumentScreen.H * wiki.scale <= screen.height * 0.781F,
                     "compact window keeps vertical margins");
-                require(screen.getTitle().getString().equals("Tropimon Wiki"), "Wiki product title");
+                require(
+                    screen.getTitle().getString().equals("Tropimon Wiki"), "Wiki product title");
                 require(
                     ((List<?>) field(screen, "all")).size() > 1000, "species registry populated");
                 stage = 1;
                 ticks = 0;
               }
               case 1 -> {
-                shot(client, "wiki");
+                shot(client, "wiki-profile");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
                 click(40, 70);
-                require(search.isFocused(), "scaled search field accepts focus");
-                search.setText("eevee");
+                require(search.isFocused(), "scaled search field focus");
+                search.setText("evoli");
                 require(
                     ((List<?>) field(screen, "filtered")).size() == 1,
-                    "English identifier search with French translation");
-                search.setText("#133");
-                require(((List<?>) field(screen, "filtered")).size() == 1, "national number search");
+                    "French search regardless of game language");
+                search.setText("eevee");
+                require(((List<?>) field(screen, "filtered")).size() == 1, "English search");
                 search.setText("no-such-pokemon");
-                require(field(screen, "selected") == null, "empty search clears selection");
-                require(field(screen, "portrait") == null, "empty search clears portrait");
+                require(
+                    field(screen, "selected") == null && field(screen, "portrait") == null,
+                    "empty search clears model");
                 search.setText("#1");
-                click(512, 173);
-                require((int) field(screen, "formIndex") == 0, "single form has no active arrow");
-                click(211, 201);
-                scroll(400, 265, -1);
-                require((int) field(screen, "detailOffset") > 0, "scaled details scroll");
+                var abilities = (List<WikiDetails.Ability>) field(screen, "abilities");
+                require(
+                    abilities.size() == 2
+                        && !abilities.getFirst().hidden()
+                        && abilities.getLast().hidden(),
+                    "Bulbasaur normal and explicit HA");
+                require(
+                    abilities.getFirst().name().equals("Engrais"),
+                    "French ability text with English game setting");
+                click(250, 206);
+                require(((Map<?, ?>) field(screen, "statBars")).size() == 6, "all six base stats");
+                require(
+                    ((List<?>) field(screen, "lines")).size() <= WikiScreen.DETAIL_ROWS,
+                    "all stats and EV visible without scroll");
                 stage = 2;
                 ticks = 0;
               }
               case 2 -> {
                 shot(client, "wiki-stats");
-                for (int i = 0; i < 6; i++) {
-                  click(210 + i * 56, 203);
-                  require((int) field(screen, "tab") == i, "scaled tab " + i);
-                  require(!((List<?>) field(screen, "lines")).isEmpty(), "tab content " + i);
-                }
-                click(322, 203);
+                click(330, 153);
+                require((int) field(screen, "tab") == 2, "ability summary opens full description");
                 require(
-                    ((List<?>) field(screen, "lines")).size() > 10, "learnset details populated");
+                    ((List<?>) field(screen, "lines"))
+                        .stream().anyMatch(x -> x.toString().contains("HA / Talent caché")),
+                    "hidden ability explained");
                 stage = 3;
                 ticks = 0;
               }
               case 3 -> {
-                shot(client, "wiki-moves");
+                shot(client, "wiki-abilities");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
-                search.setText("#26");
-                int count = ((List<?>) field(screen, "forms")).size();
-                require(count > 1, "regional forms populated");
-                click(512, 173);
-                require((int) field(screen, "formIndex") == 1, "next form");
-                click(333, 173);
-                require((int) field(screen, "formIndex") == 0, "previous form");
-                click(333, 173);
-                require((int) field(screen, "formIndex") == count - 1, "previous form wraps");
+                search.setText("#14");
+                var abilities = (List<WikiDetails.Ability>) field(screen, "abilities");
+                require(
+                    abilities.size() == 1 && !abilities.getFirst().hidden(),
+                    "Kakuna duplicate hidden slot remains one normal talent");
+                var species = (com.cobblemon.mod.common.pokemon.Species) field(screen, "selected");
+                var form = (com.cobblemon.mod.common.pokemon.FormData) field(screen, "form");
+                var definitions = new ArrayList<>(form.getEvolutions());
+                // Simulate missing network data only in this isolated synthetic world.
+                form.getEvolutions().clear();
+                try {
+                  var local = new WikiData().evolutions(species, form);
+                  require(
+                      local.local() && local.available() && local.entries().size() == 1,
+                      "missing network evolutions use installed Cobblemon reference");
+                  require(
+                      local.entries().toString().contains("beedrill")
+                          && local.entries().toString().contains("minLevel"),
+                      "fallback keeps destination and requirements");
+                  click(415, 206);
+                  require(
+                      ((List<?>) field(screen, "lines"))
+                          .stream().anyMatch(x -> x.toString().contains("Niveau 10 minimum")),
+                      "level condition is readable");
+                  require(
+                      ((List<?>) field(screen, "lines"))
+                          .stream().anyMatch(x -> x.toString().contains("Dardargnan")),
+                      "evolution destination translated");
+                } finally {
+                  form.getEvolutions().addAll(definitions);
+                }
                 stage = 4;
                 ticks = 0;
               }
               case 4 -> {
-                shot(client, "wiki-form");
+                shot(client, "wiki-evolution");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
-                int selectedForm = (int) field(screen, "formIndex");
-                scroll(400, 265, -1);
-                int detail = (int) field(screen, "detailOffset");
-                screen.resize(client, screen.width, screen.height);
-                require((int) field(screen, "formIndex") == selectedForm
-                    && (int) field(screen, "detailOffset") == detail, "resize preserves form and details");
-                search = (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
-                search.setText("#14");
-                click(378, 203);
-                var form = (com.cobblemon.mod.common.pokemon.FormData) field(screen, "form");
-                if (form.getEvolutions().isEmpty())
-                  require(((List<?>) field(screen, "lines")).stream()
-                      .anyMatch(line -> line.toString().contains("indisponibles")),
-                      "missing evolution data is described as unavailable");
+                search.setText("#133");
+                require(
+                    ((List<?>) field(screen, "lines"))
+                        .stream().anyMatch(x -> x.toString().contains("Utiliser : Pierre Foudre")),
+                    "live item evolution includes translated stone without JSON");
+                require(
+                    ((List<?>) field(screen, "lines"))
+                        .stream().anyMatch(x -> x.toString().contains("Amitié : 160")),
+                    "live friendship condition survives serialization");
                 stage = 5;
                 ticks = 0;
               }
               case 5 -> {
-                shot(client, "wiki-evolution");
+                shot(client, "wiki-eevee");
+                var search =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                search.setText("#93");
+                require(
+                    ((List<?>) field(screen, "lines"))
+                        .stream().anyMatch(x -> x.toString().contains("Échanger ce Pokémon")),
+                    "live trade evolution method");
+                search.setText("#52");
+                click(281, 183);
+                require((int) field(screen, "formIndex") == 1, "next regional form");
+                var form = (com.cobblemon.mod.common.pokemon.FormData) field(screen, "form");
+                var species = (com.cobblemon.mod.common.pokemon.Species) field(screen, "selected");
+                var local = new WikiData().localEvolutions(species, form);
+                require(local.available(), "regional form has its own fallback");
+                require(
+                    local.entries().toString().contains("alolan"),
+                    "regional fallback is not the standard form");
+                click(197, 183);
+                require((int) field(screen, "formIndex") == 0, "previous form");
+                search.setText("#1");
+                for (int i = 0; i < 7; i++) {
+                  click(197 + i * 55, 206);
+                  require(
+                      (int) field(screen, "tab") == i
+                          && !((List<?>) field(screen, "lines")).isEmpty(),
+                      "tab content " + i);
+                }
+                click(360, 206);
+                scroll(400, 265, -1);
+                require((int) field(screen, "detailOffset") == 3, "details scroll");
+                screen.resize(client, screen.width, screen.height);
+                require(
+                    (int) field(screen, "detailOffset") == 3, "resize preserves reading position");
+                stage = 6;
+                ticks = 0;
+              }
+              case 6 -> {
+                shot(client, "wiki-moves");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
                 search.setText("");
@@ -159,8 +227,8 @@ public final class SmokeClient implements ClientModInitializer {
                 require((int) field(screen, "listOffset") == 3, "species list scroll");
                 screen.resize(client, screen.width, screen.height);
                 require((int) field(screen, "listOffset") == 3, "resize preserves list position");
-                click(520, 30);
-                require(client.currentScreen == null, "scaled close button");
+                click(562, 30);
+                require(client.currentScreen == null, "close button");
                 done(client);
               }
             }
@@ -175,14 +243,13 @@ public final class SmokeClient implements ClientModInitializer {
 
   void click(int x, int y) {
     var wiki = (WikiScreen) screen;
-    screen.mouseClicked(wiki.left + (x + 0.5) * wiki.scale,
-        wiki.top + (y + 0.5) * wiki.scale, 0);
+    screen.mouseClicked(wiki.left + (x + 0.5) * wiki.scale, wiki.top + (y + 0.5) * wiki.scale, 0);
   }
 
   void scroll(int x, int y, double amount) {
     var wiki = (WikiScreen) screen;
-    screen.mouseScrolled(wiki.left + (x + 0.5) * wiki.scale,
-        wiki.top + (y + 0.5) * wiki.scale, 0, amount);
+    screen.mouseScrolled(
+        wiki.left + (x + 0.5) * wiki.scale, wiki.top + (y + 0.5) * wiki.scale, 0, amount);
   }
 
   static Object field(Object instance, String name) throws Exception {

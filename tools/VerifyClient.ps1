@@ -14,6 +14,20 @@ $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (!$LauncherDirectory) { $LauncherDirectory = Join-Path $env:APPDATA '.tropimon' }
 $launcher = $LauncherDirectory
+$profileInstances = @(Get-ChildItem (Join-Path $launcher 'profiles') -Directory -ErrorAction SilentlyContinue |
+    ForEach-Object { Join-Path $_.FullName 'instance' } | Where-Object { Test-Path (Join-Path $_ 'mods') })
+if ($profileInstances.Count -gt 1) { throw 'Select the active profile before verification.' }
+$sourceInstance = if ($profileInstances.Count -eq 1) { $profileInstances[0] } else { $launcher }
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+function Mod-Id([string]$Path) {
+    $zip = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $entry = $zip.GetEntry('fabric.mod.json')
+        if (!$entry) { return '' }
+        $reader = [IO.StreamReader]::new($entry.Open())
+        try { return ($reader.ReadToEnd() | ConvertFrom-Json).id } finally { $reader.Dispose() }
+    } finally { $zip.Dispose() }
+}
 $run = Join-Path $project "build/verify-$Mode"
 if (Get-CimInstance Win32_Process -Filter "Name='java.exe' OR Name='javaw.exe'" |
         Where-Object { $_.CommandLine -and $_.CommandLine.Contains($run) }) {
@@ -28,17 +42,22 @@ Get-ChildItem -LiteralPath $mods -Filter 'tropimon-wiki-*.jar' -File |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName }
 Copy-Item -LiteralPath $artifact -Destination $mods
 Copy-Item -LiteralPath (Join-Path $project "build/smoke-helper/tropimon-wiki-$modVersion-smoke.jar") -Destination $mods
-$activeCobblemon = if ($CobblemonJar) { @(Get-Item -LiteralPath $CobblemonJar) } else { @(Get-ChildItem (Join-Path $launcher 'mods') -Filter 'Cobblemon-fabric-*.jar' -File) }
+$activeCobblemon = if ($CobblemonJar) { @(Get-Item -LiteralPath $CobblemonJar) } else {
+    @(Get-ChildItem (Join-Path $sourceInstance 'mods') -Filter '*.jar' -File | Where-Object { (Mod-Id $_.FullName) -eq 'cobblemon' })
+}
 if ($activeCobblemon.Count -ne 1) {
     throw "La vérification exige exactement un JAR Cobblemon actif dans l'instance."
 }
 Get-ChildItem -LiteralPath $mods -Filter 'Cobblemon-fabric-*.jar' -File |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName }
-Copy-Item -LiteralPath $activeCobblemon[0].FullName -Destination $mods
-$patterns = @('fabric-api-0.116.6+1.21.1.jar', 'fabric-language-kotlin-*.jar')
+Copy-Item -LiteralPath $activeCobblemon[0].FullName -Destination (Join-Path $mods 'Cobblemon-fabric-smoke.jar')
+# Replace only the two isolated test dependencies; never alter the launcher instance.
+Get-ChildItem -LiteralPath $mods -File | Where-Object { $_.Name -like 'fabric-api-*.jar' -or $_.Name -like 'fabric-language-kotlin-*.jar' } |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+$patterns = @('fabric-api-*.jar', 'fabric-language-kotlin-*.jar')
 if ($Mode -eq 'integrations') { $patterns += @('TropimodClient-*.jar', 'TropimonBuild-*.jar', '*xaero*.jar') }
 foreach ($pattern in $patterns) {
-    Get-ChildItem (Join-Path $launcher 'mods') -Filter $pattern |
+    Get-ChildItem (Join-Path $sourceInstance 'mods') -Filter $pattern |
         Where-Object { $_.Name -notlike '*BetterPC*' } |
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $mods }
 }

@@ -84,15 +84,9 @@ final class TropimonSelfUpdater {
     ModContainer container = FabricLoader.getInstance().getModContainer(MOD_ID).orElse(null);
     if (container == null) return;
     Path installedJar = installedJar(container);
-    if (installedJar != null
-        && !installedJar
-            .getParent()
-            .equals(
-                FabricLoader.getInstance()
-                    .getGameDir()
-                    .toAbsolutePath()
-                    .normalize()
-                    .resolve("mods"))) return;
+    // Fabric's loaded origin identifies the actual profile; the launcher root may be a mirror.
+    if (installedJar != null && !installedJar.getParent().getFileName().toString().equals("mods"))
+      return;
     if (installedJar == null || recentlyChecked()) return;
 
     try {
@@ -114,7 +108,7 @@ final class TropimonSelfUpdater {
       if (checksumAsset == null) throw new IOException("Release assets incomplete");
 
       Path updateDir =
-          FabricLoader.getInstance().getConfigDir().resolve(".tropimon-updates").resolve(MOD_ID);
+          installedJar.getParent().getParent().resolve("config/.tropimon-updates").resolve(MOD_ID);
       Files.createDirectories(updateDir);
       String expectedHash = requestText(checksumAsset.url(), 512).trim().split("\\s+", 2)[0];
       if (!expectedHash.matches("(?i)[0-9a-f]{64}")) {

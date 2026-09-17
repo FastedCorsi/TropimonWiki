@@ -1,4 +1,6 @@
 import java.security.MessageDigest
+import java.util.zip.ZipFile
+import groovy.json.JsonSlurper
 plugins { id("fabric-loom") version "1.15.5" }
 version = property("mod_version") as String
 group = property("maven_group") as String
@@ -8,8 +10,16 @@ val launcherHome = providers.environmentVariable("TROPIMON_HOME").orNull?.let(::
     ?: providers.environmentVariable("APPDATA").orNull?.let { file(it).resolve(".tropimon") }
     ?: file(System.getProperty("user.home")).resolve(".tropimon")
 val overrideJar = providers.gradleProperty("cobblemonJar").orNull?.let(::file)
-val installed = launcherHome.resolve("mods").listFiles()?.filter {
-    it.isFile && it.name.matches(Regex("Cobblemon-fabric-.+\\.jar", RegexOption.IGNORE_CASE))
+val profiles = launcherHome.resolve("profiles").listFiles()?.map { it.resolve("instance") }
+    ?.filter { it.resolve("mods").isDirectory }.orEmpty()
+check(profiles.size <= 1 || overrideJar != null || providers.gradleProperty("officialDependenciesOnly").isPresent) { "Several launcher profiles exist; select the active instance with TROPIMON_HOME." }
+val instanceHome = profiles.singleOrNull() ?: launcherHome
+val installed = instanceHome.resolve("mods").listFiles()?.filter { jar ->
+    jar.isFile && jar.extension.equals("jar", true) && runCatching {
+        ZipFile(jar).use { zip -> zip.getEntry("fabric.mod.json")?.let { entry ->
+            zip.getInputStream(entry).use { (JsonSlurper().parse(it) as Map<*, *>)["id"] == "cobblemon" }
+        } ?: false }
+    }.getOrDefault(false)
 }.orEmpty()
 val officialOnly = providers.gradleProperty("officialDependenciesOnly").isPresent
 val cbJar = if (officialOnly) null else overrideJar ?: run {

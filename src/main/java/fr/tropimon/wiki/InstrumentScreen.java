@@ -7,8 +7,8 @@ import net.minecraft.util.Identifier;
 
 /** Standalone Wiki shell using the installed Cobblemon Pokédex frame. */
 abstract class InstrumentScreen extends Screen {
-  static final int W = 560,
-      H = 340,
+  static final int W = 600,
+      H = 380,
       INK = 0xFF173C39,
       PANEL = 0xFF245650,
       MUTED = 0xFFADDDD0,
@@ -50,9 +50,9 @@ abstract class InstrumentScreen extends Screen {
     c.fill(29, 19, 31, 41, accent);
     label(c, label, 40, 20, WHITE);
     label(c, subtitle, 40, 34, MUTED);
-    c.fill(27, 311, W - 27, 326, INK);
-    label(c, "By FastedCorsi", 34, 315, MUTED);
-    label(c, "Échap · Fermer", W - 116, 315, MUTED);
+    c.fill(27, H - 29, W - 27, H - 14, INK);
+    label(c, "By FastedCorsi", 34, H - 25, MUTED);
+    label(c, "Échap · Fermer", W - 116, H - 25, MUTED);
   }
 
   protected void end(DrawContext c) {
