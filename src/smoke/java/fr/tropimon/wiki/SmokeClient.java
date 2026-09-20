@@ -41,6 +41,11 @@ public final class SmokeClient implements ClientModInitializer {
                     .options
                     .getGuiScale()
                     .setValue(Integer.getInteger("tropimon.smoke.guiScale", 2));
+                client.onResolutionChanged();
+                System.out.println("WIKI_GUI requested=" + client.options.getGuiScale().getValue()
+                    + " effective=" + client.getWindow().getScaleFactor()
+                    + " viewport=" + client.getWindow().getScaledWidth() + "x"
+                    + client.getWindow().getScaledHeight());
                 client.options.pauseOnLostFocus = false;
                 client
                     .getTutorialManager()
