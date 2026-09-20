@@ -35,6 +35,13 @@ final class WikiData {
     return text(species.getTranslatedName());
   }
 
+  String habitatTitle(String nativeKey) {
+    String id = nativeKey.replace("cobblemon.habitat.", "").replace(".name", "");
+    String key = "tropimon_wiki.habitat." + id;
+    String translated = tr(key);
+    return translated.equals(key) ? tr(nativeKey) : translated;
+  }
+
   String name(String kind, String id) {
     if (kind.equals("ui")) return ui(id);
     if (kind.equals("properties")) {
@@ -124,7 +131,7 @@ final class WikiData {
     return localEvolutions(species, form);
   }
 
-  Evolutions localEvolutions(Species species, FormData form) {
+  private JsonObject localSpecies(Species species) {
     // Index paths once per opened Wiki; only the selected species JSON is read, never per frame.
     if (speciesFiles == null) {
       speciesFiles = new HashMap<>();
@@ -148,27 +155,81 @@ final class WikiData {
                 }
               });
     }
-    if (!species.getResourceIdentifier().getNamespace().equals("cobblemon"))
-      return new Evolutions(new JsonArray(), true, false);
+    if (!species.getResourceIdentifier().getNamespace().equals("cobblemon")) return null;
     Path path = speciesFiles.get(species.getResourceIdentifier().getPath());
-    if (path == null) return new Evolutions(new JsonArray(), true, false);
+    if (path == null) return null;
     try (var reader = Files.newBufferedReader(path)) {
-      JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
-      if (form != species.getStandardForm()) {
-        JsonObject matching = null;
-        if (json.has("forms"))
-          for (var candidate : json.getAsJsonArray("forms")) {
-            var object = candidate.getAsJsonObject();
-            if (WikiDetails.value(object, "name", "").equalsIgnoreCase(form.getName()))
-              matching = object;
-          }
-        if (matching == null) return new Evolutions(new JsonArray(), true, false);
-        json = matching;
-      }
-      return new Evolutions(
-          json.has("evolutions") ? json.getAsJsonArray("evolutions") : new JsonArray(), true, true);
+      return JsonParser.parseReader(reader).getAsJsonObject();
     } catch (IOException | RuntimeException failure) {
-      return new Evolutions(new JsonArray(), true, false);
+      return null;
     }
+  }
+
+  private JsonObject localForm(JsonObject species, Species selected, FormData form) {
+    if (species == null || form == selected.getStandardForm()) return species;
+    if (species.has("forms"))
+      for (var candidate : species.getAsJsonArray("forms")) {
+        var object = candidate.getAsJsonObject();
+        if (WikiDetails.value(object, "name", "").equalsIgnoreCase(form.getName())) return object;
+      }
+    return null;
+  }
+
+  record Yield(Map<String, Integer> values, boolean available, boolean local) {}
+
+  Yield evYield(Species species, FormData form) {
+    Map<String, Integer> live = new LinkedHashMap<>();
+    form.getEvYield().forEach((stat, value) -> live.put(stat.getShowdownId(), value));
+    // Cobblemon's species packet omits EV yield. An empty client map is not zero EVs.
+    if (!live.isEmpty()) return new Yield(live, true, false);
+    return localEvYield(species, form);
+  }
+
+  Yield localEvYield(Species species, FormData form) {
+    try {
+      JsonObject root = localSpecies(species), selected = localForm(root, species, form);
+      if (selected != null) return yieldFromDefinition(root, selected);
+    } catch (RuntimeException malformed) {
+      /* Unknown is not zero EVs. */
+    }
+    return new Yield(Map.of(), false, true);
+  }
+
+  static Yield yieldFromDefinition(JsonObject root, JsonObject form) {
+    // The EV field inherits as a whole, matching FormData.getEvYield().
+    Map<String, Integer> result = new LinkedHashMap<>();
+    JsonObject definition = form.has("evYield") ? form : root;
+    boolean known = definition.has("evYield");
+    if (known)
+      definition
+          .getAsJsonObject("evYield")
+          .entrySet()
+          .forEach(e -> result.put(statId(e.getKey()), e.getValue().getAsInt()));
+    return new Yield(Collections.unmodifiableMap(result), known, true);
+  }
+
+  private static String statId(String key) {
+    return switch (key) {
+      case "attack" -> "atk";
+      case "defence" -> "def";
+      case "special_attack" -> "spa";
+      case "special_defence" -> "spd";
+      case "speed" -> "spe";
+      default -> key;
+    };
+  }
+
+  Evolutions localEvolutions(Species species, FormData form) {
+    try {
+      JsonObject json = localForm(localSpecies(species), species, form);
+      if (json != null)
+        return new Evolutions(
+            json.has("evolutions") ? json.getAsJsonArray("evolutions") : new JsonArray(),
+            true,
+            true);
+    } catch (RuntimeException malformed) {
+      /* Preserve unavailable rather than failing the screen. */
+    }
+    return new Evolutions(new JsonArray(), true, false);
   }
 }

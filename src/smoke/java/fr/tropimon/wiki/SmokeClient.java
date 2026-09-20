@@ -18,6 +18,7 @@ import net.minecraft.world.level.LevelInfo;
 public final class SmokeClient implements ClientModInitializer {
   int ticks, stage = -1;
   long start;
+  int testedScale = 1;
   net.minecraft.client.gui.screen.Screen screen;
   BlockPos habitatPos;
 
@@ -42,10 +43,15 @@ public final class SmokeClient implements ClientModInitializer {
                     .getGuiScale()
                     .setValue(Integer.getInteger("tropimon.smoke.guiScale", 2));
                 client.onResolutionChanged();
-                System.out.println("WIKI_GUI requested=" + client.options.getGuiScale().getValue()
-                    + " effective=" + client.getWindow().getScaleFactor()
-                    + " viewport=" + client.getWindow().getScaledWidth() + "x"
-                    + client.getWindow().getScaledHeight());
+                System.out.println(
+                    "WIKI_GUI requested="
+                        + client.options.getGuiScale().getValue()
+                        + " effective="
+                        + client.getWindow().getScaleFactor()
+                        + " viewport="
+                        + client.getWindow().getScaledWidth()
+                        + "x"
+                        + client.getWindow().getScaledHeight());
                 client.options.pauseOnLostFocus = false;
                 client
                     .getTutorialManager()
@@ -77,12 +83,15 @@ public final class SmokeClient implements ClientModInitializer {
                 client.setScreen(screen);
                 var wiki = (WikiScreen) screen;
                 require(
-                    wiki.scale <= 1F && InstrumentScreen.H * wiki.scale <= screen.height - 15F && InstrumentScreen.W * wiki.scale <= screen.width - 15F,
+                    wiki.scale <= 1F
+                        && InstrumentScreen.H * wiki.scale <= screen.height - 15F
+                        && InstrumentScreen.W * wiki.scale <= screen.width - 15F,
                     "frame stays inside screen margins");
                 require(
                     screen.getTitle().getString().equals("Tropimon Wiki"), "Wiki product title");
                 require(
                     ((List<?>) field(screen, "all")).size() > 1000, "species registry populated");
+                auditEvYields(client);
                 stage = 1;
                 ticks = 0;
               }
@@ -380,9 +389,103 @@ public final class SmokeClient implements ClientModInitializer {
               }
               case 8 -> {
                 shot(client, "wiki-captured");
-                click(554, 30);
-                require(client.currentScreen == null, "close button");
-                done(client);
+                var search =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                search.setText("#5");
+                click(400, 64);
+                require((int) field(screen, "tab") == 6, "habitats button opens spawn view");
+                stage = 9;
+                ticks = 0;
+              }
+              case 9 -> {
+                if ((boolean) field(screen, "spawnLoading")
+                    || (boolean) field(screen, "previewLoading")) return;
+                require(field(screen, "spawnCatalog") != null, "installed spawn catalogue loaded");
+                var entries = (List<WikiSpawns.Entry>) field(screen, "spawnEntries");
+                require(
+                    !entries.isEmpty() && entries.stream().allMatch(WikiSpawns.Entry::habitat),
+                    "Charmeleon has habitat entries");
+                require(
+                    field(screen, "habitatPreview") != null,
+                    "habitat has actual structure preview");
+                shot(client, "wiki-habitat");
+                click(320, 236);
+                require(!(boolean) field(screen, "habitatMode"), "switch to wild spawns");
+                entries = (List<WikiSpawns.Entry>) field(screen, "spawnEntries");
+                require(
+                    entries.stream().anyMatch(e -> e.spawn().has("herdMember")),
+                    "herd spawns included");
+                require(
+                    entries.stream().anyMatch(e -> e.spawn().has("condition")),
+                    "wild conditions retained");
+                stage = 10;
+                ticks = 0;
+              }
+              case 10 -> {
+                if (testedScale == 1) shot(client, "wiki-spawns");
+                client.options.getGuiScale().setValue(testedScale);
+                client.onResolutionChanged();
+                screen = client.currentScreen;
+                System.out.println(
+                    "WIKI_GUI requested="
+                        + testedScale
+                        + " effective="
+                        + client.getWindow().getScaleFactor()
+                        + " framebuffer="
+                        + client.getWindow().getFramebufferWidth()
+                        + "x"
+                        + client.getWindow().getFramebufferHeight());
+                stage = 13;
+                ticks = 0;
+              }
+              case 13 -> {
+                screen = client.currentScreen;
+                click(320, 206);
+                require((int) field(screen, "tab") == 2, "moves tab at GUI " + testedScale);
+                click(250, 236);
+                var query =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch");
+                query.setText("scratch");
+                require(
+                    query.isFocused() && !((Map<?, ?>) field(screen, "moveRows")).isEmpty(),
+                    "move search works at GUI " + testedScale);
+                screen.resize(client, screen.width, screen.height);
+                require(
+                    ((net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch"))
+                        .getText()
+                        .equals("scratch"),
+                    "GUI resize preserves query");
+                stage = 11;
+                ticks = 0;
+              }
+              case 11 -> {
+                require(
+                    client.currentScreen == screen && (int) field(screen, "tab") == 2,
+                    "same moves screen after scale settles " + testedScale);
+                shot(client, "wiki-gui-" + testedScale);
+                click(550, 236);
+                require(
+                    ((net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch"))
+                        .getText()
+                        .isEmpty(),
+                    "clear at GUI " + testedScale);
+                scroll(400, 280, -1);
+                require((int) field(screen, "detailOffset") > 0, "scroll at GUI " + testedScale);
+                click(250, 206);
+                hover(client, 330, 153);
+                stage = 12;
+                ticks = 0;
+              }
+              case 12 -> {
+                shot(client, "wiki-gui-stats-" + testedScale);
+                if (++testedScale <= 4) {
+                  stage = 10;
+                  ticks = 0;
+                } else {
+                  click(554, 32);
+                  require(client.currentScreen == null, "close button after GUI matrix");
+                  done(client);
+                }
               }
             }
           } catch (Throwable ex) {
@@ -392,6 +495,53 @@ public final class SmokeClient implements ClientModInitializer {
             stage = 99;
           }
         });
+  }
+
+  void auditEvYields(MinecraftClient client) {
+    var data = new WikiData();
+    int audited = 0, forms = 0, unknown = 0;
+    for (var species : com.cobblemon.mod.common.api.pokemon.PokemonSpecies.getSpecies()) {
+      var local = data.localEvYield(species, species.getStandardForm());
+      if (!species.getResourceIdentifier().getNamespace().equals("cobblemon")) continue;
+      if (!local.available()
+          || local.values().values().stream().mapToInt(Integer::intValue).sum() <= 0)
+        throw new AssertionError("Missing standard EV definition: " + species.getName());
+      audited++;
+      for (var form : species.getForms()) {
+        var result = data.localEvYield(species, form);
+        if (result.available()) forms++;
+        else unknown++;
+      }
+    }
+    require(
+        audited >= 1025,
+        "all standard species have nonzero local EV data: "
+            + audited
+            + "; forms="
+            + forms
+            + " unavailable forms="
+            + unknown);
+    var original =
+        com.cobblemon.mod.common.api.pokemon.PokemonSpecies.INSTANCE.getByName("charmeleon");
+    var buffer =
+        new net.minecraft.network.RegistryByteBuf(
+            io.netty.buffer.Unpooled.buffer(), client.world.getRegistryManager());
+    try {
+      original.encode(buffer);
+      var network = new com.cobblemon.mod.common.pokemon.Species();
+      network.decode(buffer);
+      network.setResourceIdentifier(original.getResourceIdentifier());
+      network.initialize();
+      var yield = data.evYield(network, network.getStandardForm());
+      require(
+          yield.local()
+              && yield.available()
+              && yield.values().getOrDefault("spa", 0) == 1
+              && yield.values().getOrDefault("spe", 0) == 1,
+          "real species packet falls back to Charmeleon +1 SpA +1 Speed");
+    } finally {
+      buffer.release();
+    }
   }
 
   void hover(MinecraftClient client, int x, int y) {

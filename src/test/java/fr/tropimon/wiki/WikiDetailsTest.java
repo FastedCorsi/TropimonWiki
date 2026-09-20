@@ -139,6 +139,28 @@ class WikiDetailsTest {
     assertEquals(0, WikiDetails.generation(0));
   }
 
+  @Test
+  void evDefinitionsInheritFormStatsWithoutConfusingMissingAndZero() {
+    var base =
+        JsonParser.parseString("{\"evYield\":{\"special_attack\":1,\"speed\":1}}")
+            .getAsJsonObject();
+    var form =
+        JsonParser.parseString("{\"evYield\":{\"special_attack\":0,\"speed\":2}}")
+            .getAsJsonObject();
+    assertEquals(
+        java.util.Map.of("spa", 0, "spe", 2), WikiData.yieldFromDefinition(base, form).values());
+    assertEquals(
+        java.util.Map.of("spa", 1, "spe", 1),
+        WikiData.yieldFromDefinition(base, new com.google.gson.JsonObject()).values());
+    assertFalse(
+        WikiData.yieldFromDefinition(
+                new com.google.gson.JsonObject(), new com.google.gson.JsonObject())
+            .available());
+    var zero = JsonParser.parseString("{\"evYield\":{\"hp\":0}}").getAsJsonObject();
+    assertTrue(WikiData.yieldFromDefinition(zero, zero).available());
+    assertEquals(0, WikiData.yieldFromDefinition(zero, zero).values().get("hp"));
+  }
+
   private List<String> evolution(String json) {
     return WikiDetails.evolution(
         JsonParser.parseString(json).getAsJsonObject(),

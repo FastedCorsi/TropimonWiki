@@ -45,13 +45,13 @@ abstract class InstrumentScreen extends Screen {
     c.getMatrices().translate(left, top, 0);
     c.getMatrices().scale(scale, scale, 1);
     // Backing stays inside the native aperture; the frame is painted above its contents.
-    c.fill(31, 25, W - 31, 357, 0xFF386A5D);
+    c.fill(31, 25, W - 31, 360, 0xFF386A5D);
     c.getMatrices().translate(CONTENT_OFFSET_X, 0, 0);
     c.fill(27, 25, W - 35, 50, INK);
     c.fill(29, 28, 31, 47, accent);
     label(c, label, 40, 28, WHITE);
     label(c, subtitle, 40, 40, MUTED);
-    c.fill(27, 343, W - 35, 357, INK);
+    c.fill(27, 343, W - 35, 360, INK);
     label(c, "By FastedCorsi", 34, 345, MUTED);
     label(c, Text.translatable("tropimon_wiki.close").getString(), W - 116, 345, MUTED);
   }

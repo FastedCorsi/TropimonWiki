@@ -1,6 +1,6 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.6
+By FastedCorsi — 0.1.7
 
 **F7** : Tropimon Wiki (touche reconfigurable).
 
@@ -27,7 +27,7 @@ Le build local identifie l'unique JAR Cobblemon par fabric.mod.json, même si so
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.6/local` et `build/release/0.1.6/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.7/local` et `build/release/0.1.7/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
 
 L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Le nouvel updater prend aussi en charge les deux copies et le suivi du stockage géré, sans dépendance à un autre mod. Les anciennes versions déjà distribuées ne sont pas réparées rétroactivement. Vérification asynchrone au démarrage uniquement après consentement explicite, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 
@@ -49,3 +49,14 @@ Pour modifier le choix en jeu : `/tropimonupdates tropimon_wiki`. Refuser laisse
 Les versions à consentement utilisent un canal de releases distinct du lien GitHub « latest » historique : sélectionner la version par son tag. Cela évite de déclencher les anciens updaters sans accord.
 
 Les marges intérieures sont centrées dans l’ouverture du cadre natif, sans fond rectangulaire extérieur. Les onglets Attaques et Élevage disposent d’un filtre local par nom traduit, identifiant technique ou type. Il conserve la recherche de Pokémon et se vide avec sa croix. Les barres de statistiques de base reprennent le dégradé rouge → jaune → vert : rouge à 40 ou moins, jaune à 90, vert à 140 ou plus ; les valeurs exactes restent affichées.
+
+
+## Habitats, apparitions et EV
+
+Le bouton « Habitats · Apparitions » présente les habitats et les apparitions naturelles de la forme choisie. Les niveaux, raretés, phases, biomes, horaires, météo, prérequis, exclusions, groupes et multiplicateurs proviennent des définitions des mods installés ; un poids relatif ne représente pas une probabilité en pourcentage. Les données personnalisées d’un serveur distant ne sont pas synchronisées par cette interface. Une absence locale signifie « aucune apparition renseignée », jamais « impossible sur le serveur ».
+
+L’aperçu représente une variante de la véritable structure NBT locale, associée au bloc d’habitat portant son identifiant de pool. Aucun téléchargement ni image de structure redistribuée : les blocs sont dessinés avec les ressources du jeu. Les variantes, processeurs et raccords peuvent différer dans le monde. Le catalogue est lu une fois à la demande dans une tâche asynchrone ; seul le modèle de l’habitat sélectionné est conservé. Le Wiki reste indépendant de Tropimon Farm.
+
+Le paquet d’espèce Cobblemon omet les EV gagnés. Le Wiki utilise les définitions du Cobblemon chargé si le client n’a pas cette information, avec héritage des formes et distinction entre zéro explicite et donnée inconnue. La provenance est expliquée au survol de la ligne EV. Le contrôle isolé parcourt toutes les espèces et formes locales et teste aussi un véritable aller-retour du paquet réseau.
+
+Le bas du panneau rejoint l’ouverture du cadre ; le champ d’attaques utilise un fond sombre pour conserver le contraste avec le texte et son ombre native. Les essais isolés passent les échelles GUI demandées 1 à 4, consignent leur échelle effective et vérifient saisie, clics, défilement, redimensionnement et fermeture. Le mod ne change pas le réglage global du joueur.

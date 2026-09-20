@@ -34,6 +34,13 @@ public final class WikiScreen extends InstrumentScreen {
   private int listOffset, detailOffset, tab, formIndex, generation;
   private TextFieldWidget search, moveSearch;
   private ModelWidget portrait;
+  private WikiSpawns.Catalog spawnCatalog;
+  private List<WikiSpawns.Entry> spawnEntries = List.of();
+  private boolean spawnLoading, spawnFailed, habitatMode = true, previewLoading;
+  private int spawnIndex, previewRevision;
+  private StructurePreview.Model habitatPreview;
+  private String previewPool = "";
+
   private List<WikiDetails.Ability> abilities = List.of();
   private final List<TypeIcon> typeIcons = new ArrayList<>();
   private final List<FormData> forms = new ArrayList<>();
@@ -76,7 +83,7 @@ public final class WikiScreen extends InstrumentScreen {
     moveSearch =
         new TextFieldWidget(textRenderer, 196, 231, 345, 12, Text.literal(data.ui("moves.search")));
     moveSearch.setDrawsBackground(false);
-    moveSearch.setEditableColor(INK);
+    moveSearch.setEditableColor(WHITE);
     moveSearch.setMaxLength(80);
     moveSearch.setPlaceholder(Text.literal(data.ui("moves.search")));
     moveSearch.setText(oldMoveQuery);
@@ -115,6 +122,7 @@ public final class WikiScreen extends InstrumentScreen {
   private void select(Species species) {
     selected = species;
     formIndex = 0;
+    spawnIndex = 0;
     forms.clear();
     if (species != null) {
       forms.add(species.getStandardForm());
@@ -212,19 +220,19 @@ public final class WikiScreen extends InstrumentScreen {
         }
         paragraph("");
         heading(data.ui("total") + total);
+        var yield = data.evYield(selected, form);
         String evs =
             String.join(
                 " · ",
-                form.getEvYield().entrySet().stream()
+                yield.values().entrySet().stream()
                     .filter(e -> e.getValue() > 0)
-                    .map(
-                        e ->
-                            "+"
-                                + e.getValue()
-                                + " "
-                                + data.name("stat", e.getKey().getShowdownId()))
+                    .map(e -> "+" + e.getValue() + " " + data.name("stat", e.getKey()))
                     .toList());
-        paragraph(data.ui("evs") + (evs.isEmpty() ? data.ui("none") : evs));
+        paragraph(
+            data.ui("evs")
+                + (!yield.available()
+                    ? data.ui("evs.unknown")
+                    : evs.isEmpty() ? data.ui("none") : evs));
       }
       case 2 -> {
         var moves = form.getMoves();
@@ -301,6 +309,7 @@ public final class WikiScreen extends InstrumentScreen {
         if (form.getMoves().getEggMoves().isEmpty()) paragraph(data.ui("egg_move.none"));
         for (var move : form.getMoves().getEggMoves()) move(data.ui("egg_move"), move);
       }
+      case 6 -> buildSpawns();
       case 5 -> {
         heading(data.ui("drops.title"));
         paragraph(data.ui("drops.server"));
@@ -324,9 +333,131 @@ public final class WikiScreen extends InstrumentScreen {
           }
       }
     }
-    if (hasMoveSearch() && moveSearch != null && !moveSearch.getText().isBlank() && moveRows.isEmpty())
-      paragraph(data.ui("moves.empty"));
+    if (hasMoveSearch()
+        && moveSearch != null
+        && !moveSearch.getText().isBlank()
+        && moveRows.isEmpty()) paragraph(data.ui("moves.empty"));
     else if (lines.isEmpty()) paragraph(data.ui("data.none"));
+  }
+
+  private void buildSpawns() {
+    if (spawnCatalog == null) {
+      paragraph(data.ui(spawnFailed ? "spawn.unavailable" : "spawn.loading"));
+      if (!spawnLoading && !spawnFailed) {
+        spawnLoading = true;
+        java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> {
+                  try {
+                    return WikiSpawns.load();
+                  } catch (java.io.IOException failure) {
+                    throw new java.util.concurrent.CompletionException(failure);
+                  }
+                })
+            .whenComplete(
+                (catalog, failure) ->
+                    client.execute(
+                        () -> {
+                          spawnLoading = false;
+                          spawnFailed = failure != null;
+                          spawnCatalog = catalog;
+                          if (client.currentScreen == this && tab == 6) rebuild();
+                        }));
+      }
+      return;
+    }
+    spawnEntries =
+        spawnCatalog.entries().stream()
+            .filter(e -> e.habitat() == habitatMode && e.matches(selected, form))
+            .toList();
+    if (spawnEntries.isEmpty()) {
+      habitatPreview = null;
+      previewPool = "";
+      previewRevision++;
+      paragraph(data.ui("spawn.none"));
+      paragraph(data.ui("spawn.source"));
+      return;
+    }
+    spawnIndex = Math.floorMod(spawnIndex, spawnEntries.size());
+    var entry = spawnEntries.get(spawnIndex);
+    paragraphX = habitatMode ? 312 : 195;
+    heading(habitatMode ? data.habitatTitle(entry.title()) : data.ui("spawn.wild"));
+    for (String line : WikiSpawns.describe(entry, data)) paragraph(line);
+    paragraph("");
+    paragraph(data.ui("spawn.source"));
+    if (spawnCatalog.skipped() > 0) paragraph(data.ui("spawn.incomplete"));
+    paragraphX = 195;
+    if (!habitatMode) {
+      habitatPreview = null;
+      previewPool = "";
+      previewRevision++;
+      return;
+    }
+    if (previewPool.equals(entry.pool())) return;
+    previewPool = entry.pool();
+    habitatPreview = null;
+    int revision = ++previewRevision;
+    var templates = spawnCatalog.structures().pools().getOrDefault(entry.pool(), List.of());
+    previewLoading = !templates.isEmpty();
+    if (templates.isEmpty()) return;
+    // Read one installed template per selected habitat, never from the render loop.
+    java.util.concurrent.CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                return StructurePreview.read(templates.getFirst().path());
+              } catch (java.io.IOException failure) {
+                throw new java.util.concurrent.CompletionException(failure);
+              }
+            })
+        .whenComplete(
+            (nbt, failure) ->
+                client.execute(
+                    () -> {
+                      if (revision != previewRevision || client.currentScreen != this) return;
+                      previewLoading = false;
+                      try {
+                        if (failure == null) habitatPreview = StructurePreview.model(nbt);
+                      } catch (java.io.IOException | RuntimeException invalid) {
+                        habitatPreview = null;
+                      }
+                    }));
+  }
+
+  private void renderSpawns(DrawContext c, int mx, int my) {
+    chip(
+        c,
+        data.ui("spawn.habitats"),
+        192,
+        227,
+        88,
+        habitatMode,
+        hit(mx, my, 192, 227, 88, 21),
+        ACCENT);
+    chip(
+        c,
+        data.ui("spawn.nature"),
+        283,
+        227,
+        88,
+        !habitatMode,
+        hit(mx, my, 283, 227, 88, 21),
+        ACCENT);
+    chip(c, "‹", 394, 227, 21, false, hit(mx, my, 394, 227, 21, 21), ACCENT);
+    label(
+        c,
+        spawnEntries.isEmpty() ? "0 / 0" : (spawnIndex + 1) + " / " + spawnEntries.size(),
+        429,
+        234,
+        INK);
+    chip(c, "›", 537, 227, 21, false, hit(mx, my, 537, 227, 21, 21), ACCENT);
+    if (habitatMode && !spawnEntries.isEmpty()) {
+      c.fill(192, 251, 306, 338, PANEL);
+      if (habitatPreview != null) {
+        clip(c, 192, 251, 114, 87);
+        StructurePreview.render(c, habitatPreview, 194, 253, 110, 83, 135F, 1.6F);
+        c.disableScissor();
+      } else
+        text(c, data.ui(previewLoading ? "spawn.loading" : "spawn.no_image"), 198, 266, 102, WHITE);
+    }
   }
 
   private String eggGroup(String id) {
@@ -355,11 +486,11 @@ public final class WikiScreen extends InstrumentScreen {
   }
 
   private int visibleDetailRows() {
-    return hasMoveSearch() ? 7 : DETAIL_ROWS;
+    return hasMoveSearch() || tab == 6 ? 7 : DETAIL_ROWS;
   }
 
   private int detailY() {
-    return hasMoveSearch() ? 252 : 230;
+    return hasMoveSearch() || tab == 6 ? 252 : 230;
   }
 
   private void move(String origin, MoveTemplate move) {
@@ -466,7 +597,7 @@ public final class WikiScreen extends InstrumentScreen {
           WHITE);
     } else {
       c.fill(187, 54, 565, 78, INK);
-      label(c, textRenderer.trimToWidth(data.species(selected), 295), 197, 62, WHITE);
+      label(c, textRenderer.trimToWidth(data.species(selected), 182), 197, 62, WHITE);
       label(c, "#" + selected.getNationalPokedexNumber(), 531, 62, MUTED);
       c.fill(187, 81, 292, 169, 0xFF2C7D78);
       c.fill(190, 84, 289, 166, 0xFF62B9B1);
@@ -511,6 +642,8 @@ public final class WikiScreen extends InstrumentScreen {
         chip(c, "‹", 187, 173, 21, false, hit(mx, my, 187, 173, 21, 21), ACCENT);
         chip(c, "›", 271, 173, 21, false, hit(mx, my, 271, 173, 21, 21), ACCENT);
       }
+      chip(
+          c, data.ui("tab.habitat"), 389, 55, 134, tab == 6, hit(mx, my, 389, 55, 134, 21), ACCENT);
       for (int i = 0; i < TABS.length; i++)
         chip(
             c,
@@ -522,16 +655,18 @@ public final class WikiScreen extends InstrumentScreen {
             hit(mx, my, DETAIL_X + i * 63, TAB_Y, 61, 21),
             ACCENT);
       c.fill(187, 224, 565, 341, 0xFFE2F1E5);
+      if (tab == 6) renderSpawns(c, mx, my);
       if (hasMoveSearch()) {
         c.fill(192, 227, 558, 246, moveSearch.isFocused() ? 0xFF398971 : 0xFF83AF99);
-        c.fill(193, 228, 557, 245, 0xFFF2FFF4);
+        c.fill(193, 228, 557, 245, PANEL);
         moveSearch.render(c, mx, my, delta);
         if (!moveSearch.getText().isEmpty())
-          label(c, "×", 547, 232, hit(mx, my, 544, 227, 14, 19) ? 0xFFAF3644 : INK);
+          label(c, "×", 547, 232, hit(mx, my, 544, 227, 14, 19) ? 0xFFFF777A : WHITE);
       }
       for (int i = 0; i < visibleDetailRows() && detailOffset + i < lines.size(); i++) {
         int index = detailOffset + i, y = detailY() + i * 12;
-        if (headings.contains(index)) c.fill(192, y - 2, 558, y + 10, 0xFFBBDDC8);
+        if (headings.contains(index))
+          c.fill(tab == 6 && habitatMode ? 309 : 192, y - 2, 558, y + 10, 0xFFBBDDC8);
         if (statBars.containsKey(index)) {
           int value = statBars.get(index);
           c.fill(340, y + 1, 524, y + 8, 0xFFB6D5C2);
@@ -598,6 +733,11 @@ public final class WikiScreen extends InstrumentScreen {
       c.disableScissor();
     }
     List<Text> tooltip = new ArrayList<>();
+    if (tab == 1 && hit(mx, my, 192, 320, 366, 21))
+      tooltip.add(Text.literal(data.ui("evs.source")));
+    if (tab == 6 && hit(mx, my, 192, 251, 114, 87) && !spawnEntries.isEmpty())
+      tooltip.add(Text.literal(data.ui("spawn.preview")));
+
     for (int i = 0; i < Math.min(3, abilities.size()); i++) {
       if (hit(mx, my, 304, 125 + i * 22, 261, 20)) {
         var ability = abilities.get(i);
@@ -658,6 +798,21 @@ public final class WikiScreen extends InstrumentScreen {
       return true;
     }
     if (selected != null) {
+      if (hit(mx, my, 389, 55, 134, 21)) {
+        tab = 6;
+        spawnIndex = 0;
+        rebuild();
+        return true;
+      }
+      if (tab == 6 && hit(mx, my, 192, 227, 366, 21)) {
+        if (mx < 374) {
+          habitatMode = mx < 283;
+          spawnIndex = 0;
+        } else if (mx >= 537) spawnIndex++;
+        else if (mx < 415) spawnIndex--;
+        rebuild();
+        return true;
+      }
       if (hit(mx, my, DETAIL_X, TAB_Y, 378, 21) && (mx - DETAIL_X) % 63 < 61) {
         tab = Math.min(5, (mx - DETAIL_X) / 63);
         moveSearch.setFocused(false);
