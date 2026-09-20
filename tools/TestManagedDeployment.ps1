@@ -11,11 +11,8 @@ $source = Join-Path $fixture 'TropimonWiki-test-LOCAL.jar'
 Copy-Item -LiteralPath $Jar -Destination $source
 $hash = (Get-FileHash -LiteralPath $source).Hash
 [IO.File]::WriteAllText(($source + '.sha256'), $hash)
-$java = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../src/main/java/fr/tropimon/wiki/TropimonSelfUpdater.java') -Raw
-$match = [regex]::Match($java, '(?s)WINDOWS_MANAGED_INSTALLER\s*=\s*"""\r?\n(.*?)\r?\n\s*""";')
-if (!$match.Success) { throw 'Managed updater transaction missing.' }
-$autonomous = Join-Path $fixture 'autonomous.ps1'
-[IO.File]::WriteAllText($autonomous, $match.Groups[1].Value.Replace('\\', '\'), [Text.UTF8Encoding]::new($true))
+# The player installer is now Java; UpdaterSafetyTest executes its actual exported helper.
+# Keep these separate regression checks for the external local-delivery PowerShell tool.
 
 function Assert([bool]$Condition, [string]$Message) {
     if (!$Condition) { throw $Message }
@@ -34,7 +31,7 @@ function Run-Installer([string]$Expected, [string[]]$Extra = @()) {
     $result = ($output | Select-Object -Last 1) | ConvertFrom-Json
     Assert ($result.state -eq $Expected) ('Installer state: ' + $Expected + '; actual: ' + $result.state + '; error type: ' + $result.errorType)
 }
-foreach ($installer in @((Join-Path $PSScriptRoot 'InstallManagedLocalMod.ps1'), $autonomous)) {
+foreach ($installer in @((Join-Path $PSScriptRoot 'InstallManagedLocalMod.ps1'))) {
     $profile = Join-Path $fixture ([guid]::NewGuid().ToString('N'))
     $instance = Join-Path $profile 'instance'
     $mods = Join-Path $instance 'mods'
@@ -68,7 +65,6 @@ foreach ($installer in @((Join-Path $PSScriptRoot 'InstallManagedLocalMod.ps1'),
     [IO.File]::WriteAllText($tracker, '{"unknown":[]}')
     Run-Installer 'blocked'
     [IO.File]::WriteAllText($tracker, (ConvertTo-Json -InputObject $tracked))
-    if ($installer -eq $autonomous) { Run-Installer 'blocked' @('-LoadedTarget', $target, '-ExpectedLoadedHash', ('0' * 64)) }
     Copy-Item -LiteralPath $source -Destination (Join-Path $mods 'duplicate.jar')
     Run-Installer 'blocked'
     # Move only the exact synthetic fixture file, never a computed recursive target.
@@ -79,4 +75,4 @@ foreach ($installer in @((Join-Path $PSScriptRoot 'InstallManagedLocalMod.ps1'),
     Run-Installer 'blocked'
     Assert ((Get-FileHash -LiteralPath $imported).Hash -eq $hash) 'Blocked installs preserve imported copy'
 }
-Write-Output 'Managed deployment and autonomous updater transactions passed.'
+Write-Output 'External managed delivery transactions passed; Java updater is covered by UpdaterSafetyTest.'
