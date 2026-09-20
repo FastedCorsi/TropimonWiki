@@ -46,13 +46,13 @@ abstract class InstrumentScreen extends Screen {
     c.fill(6, 6, W + 4, H + 4, 0x6609181B);
     c.fill(18, 15, W - 18, H - 15, 0xFF386A5D);
     c.drawTexture(FRAME, 0, 0, W, H, 0, 0, 345, 207, 345, 207);
-    c.fill(27, 15, W - 27, 47, INK);
+    c.fill(27, 15, W - 35, 47, INK);
     c.fill(29, 19, 31, 41, accent);
     label(c, label, 40, 20, WHITE);
     label(c, subtitle, 40, 34, MUTED);
-    c.fill(27, H - 29, W - 27, H - 14, INK);
+    c.fill(27, H - 29, W - 35, H - 14, INK);
     label(c, "By FastedCorsi", 34, H - 25, MUTED);
-    label(c, "Échap · Fermer", W - 116, H - 25, MUTED);
+    label(c, Text.translatable("tropimon_wiki.close").getString(), W - 116, H - 25, MUTED);
   }
 
   protected void end(DrawContext c) {

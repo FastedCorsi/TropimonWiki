@@ -69,7 +69,13 @@ val testLocalDelivery by tasks.registering(Exec::class) {
     commandLine("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
         file("tools/TestDeployment.ps1").absolutePath, "-Jar", tasks.remapJar.get().archiveFile.get().asFile.absolutePath)
 }
-tasks.check { dependsOn(privacyCheck, testLocalDelivery) }
+val testManagedDelivery by tasks.registering(Exec::class) {
+    dependsOn(tasks.remapJar)
+    onlyIf { System.getProperty("os.name").startsWith("Windows") }
+    commandLine("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+        file("tools/TestManagedDeployment.ps1").absolutePath, "-Jar", tasks.remapJar.get().archiveFile.get().asFile.absolutePath)
+}
+tasks.check { dependsOn(privacyCheck, testLocalDelivery, testManagedDelivery) }
 tasks.register("prepareReleaseDelivery") {
     dependsOn(tasks.build)
     doLast {
@@ -81,7 +87,9 @@ tasks.register("prepareReleaseDelivery") {
             source.copyTo(dest, true)
             val hash = MessageDigest.getInstance("SHA-256").digest(dest.readBytes()).joinToString("") { "%02x".format(it) }
             dest.resolveSibling(dest.name + ".sha256").writeText(hash + "\n")
-            if (kind == "local") file("tools/install-local-deferred.ps1").copyTo(dir.resolve("install-local-deferred.ps1"), true)
+            if (kind == "local") for (script in listOf("install-local-deferred.ps1", "InstallManagedLocalMod.ps1")) {
+                file("tools/$script").copyTo(dir.resolve(script), true)
+            }
         }
     }
 }

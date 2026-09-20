@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Jar)
+﻿param([Parameter(Mandatory=$true)][string]$Jar)
 # Import the engine's built-in modules explicitly, including when launched by a build daemon.
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -ErrorAction Stop
 Import-Module (Join-Path $PSHOME 'Modules/CimCmdlets/CimCmdlets.psd1') -ErrorAction Stop
@@ -8,7 +8,7 @@ $instance=Join-Path $fixture 'instance'
 $delivery=Join-Path $fixture 'delivery'
 New-Item -ItemType Directory -Path (Join-Path $instance 'mods'),$delivery | Out-Null
 $script=Join-Path $delivery 'install-local-deferred.ps1'
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-local-deferred.ps1') -Destination $script
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-unmanaged-deferred.ps1') -Destination $script
 $source=Join-Path $delivery 'TropimonWiki-0.1.0+1.21.1-LOCAL.jar'
 Copy-Item -LiteralPath $Jar -Destination $source
 $hash=(Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash

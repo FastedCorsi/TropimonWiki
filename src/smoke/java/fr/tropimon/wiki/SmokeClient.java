@@ -87,10 +87,9 @@ public final class SmokeClient implements ClientModInitializer {
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
                 click(40, 70);
                 require(search.isFocused(), "scaled search field focus");
-                search.setText("evoli");
+                search.setText(client.options.language.equals("fr_fr") ? "evoli" : "eevee");
                 require(
-                    ((List<?>) field(screen, "filtered")).size() == 1,
-                    "French search regardless of game language");
+                    ((List<?>) field(screen, "filtered")).size() == 1, "Search in player language");
                 search.setText("eevee");
                 require(((List<?>) field(screen, "filtered")).size() == 1, "English search");
                 search.setText("no-such-pokemon");
@@ -105,8 +104,11 @@ public final class SmokeClient implements ClientModInitializer {
                         && abilities.getLast().hidden(),
                     "Bulbasaur normal and explicit HA");
                 require(
-                    abilities.getFirst().name().equals("Engrais"),
-                    "French ability text with English game setting");
+                    abilities
+                        .getFirst()
+                        .name()
+                        .equals(client.options.language.equals("fr_fr") ? "Engrais" : "Overgrow"),
+                    "Ability follows player language");
                 click(250, 206);
                 require(((Map<?, ?>) field(screen, "statBars")).size() == 6, "all six base stats");
                 require(
@@ -117,12 +119,8 @@ public final class SmokeClient implements ClientModInitializer {
               }
               case 2 -> {
                 shot(client, "wiki-stats");
-                click(330, 153);
-                require((int) field(screen, "tab") == 2, "ability summary opens full description");
-                require(
-                    ((List<?>) field(screen, "lines"))
-                        .stream().anyMatch(x -> x.toString().contains("HA / Talent caché")),
-                    "hidden ability explained");
+                hover(client, 330, 153);
+                require((int) field(screen, "tab") == 1, "ability hover does not change tabs");
                 stage = 3;
                 ticks = 0;
               }
@@ -149,18 +147,40 @@ public final class SmokeClient implements ClientModInitializer {
                       local.entries().toString().contains("beedrill")
                           && local.entries().toString().contains("minLevel"),
                       "fallback keeps destination and requirements");
-                  click(415, 206);
+                  click(388, 206);
                   require(
                       ((List<?>) field(screen, "lines"))
-                          .stream().anyMatch(x -> x.toString().contains("Niveau 10 minimum")),
+                          .stream()
+                              .anyMatch(
+                                  x ->
+                                      x.toString()
+                                          .contains(
+                                              client.options.language.equals("fr_fr")
+                                                  ? "Niveau 10 minimum"
+                                                  : "Level 10 minimum")),
                       "level condition is readable");
                   require(
                       ((List<?>) field(screen, "lines"))
-                          .stream().anyMatch(x -> x.toString().contains("Dardargnan")),
+                          .stream()
+                              .anyMatch(
+                                  x ->
+                                      x.toString()
+                                          .contains(
+                                              client.options.language.equals("fr_fr")
+                                                  ? "Dardargnan"
+                                                  : "Beedrill")),
                       "evolution destination translated");
                 } finally {
                   form.getEvolutions().addAll(definitions);
                 }
+                require(
+                    ((List<?>) field(screen, "evolutionPreviews")).size() == 1,
+                    "evolution destination has a model");
+                require(
+                    ((List<?>) field(screen, "lines"))
+                        .stream().noneMatch(x -> x.toString().contains("RÉFÉRENCE")),
+                    "reference banner removed");
+                hover(client, 550, 28);
                 stage = 4;
                 ticks = 0;
               }
@@ -171,11 +191,25 @@ public final class SmokeClient implements ClientModInitializer {
                 search.setText("#133");
                 require(
                     ((List<?>) field(screen, "lines"))
-                        .stream().anyMatch(x -> x.toString().contains("Utiliser : Pierre Foudre")),
+                        .stream()
+                            .anyMatch(
+                                x ->
+                                    x.toString()
+                                        .contains(
+                                            client.options.language.equals("fr_fr")
+                                                ? "Utiliser : Pierre Foudre"
+                                                : "Use: Thunder Stone")),
                     "live item evolution includes translated stone without JSON");
                 require(
                     ((List<?>) field(screen, "lines"))
-                        .stream().anyMatch(x -> x.toString().contains("Amitié : 160")),
+                        .stream()
+                            .anyMatch(
+                                x ->
+                                    x.toString()
+                                        .contains(
+                                            client.options.language.equals("fr_fr")
+                                                ? "Amitié : 160"
+                                                : "Friendship: 160")),
                     "live friendship condition survives serialization");
                 stage = 5;
                 ticks = 0;
@@ -187,7 +221,14 @@ public final class SmokeClient implements ClientModInitializer {
                 search.setText("#93");
                 require(
                     ((List<?>) field(screen, "lines"))
-                        .stream().anyMatch(x -> x.toString().contains("Échanger ce Pokémon")),
+                        .stream()
+                            .anyMatch(
+                                x ->
+                                    x.toString()
+                                        .contains(
+                                            client.options.language.equals("fr_fr")
+                                                ? "Échanger ce Pokémon"
+                                                : "Trade this Pokémon")),
                     "live trade evolution method");
                 search.setText("#52");
                 click(281, 183);
@@ -202,14 +243,14 @@ public final class SmokeClient implements ClientModInitializer {
                 click(197, 183);
                 require((int) field(screen, "formIndex") == 0, "previous form");
                 search.setText("#1");
-                for (int i = 0; i < 7; i++) {
-                  click(197 + i * 55, 206);
+                for (int i = 0; i < 6; i++) {
+                  click(197 + i * 63, 206);
                   require(
                       (int) field(screen, "tab") == i
                           && !((List<?>) field(screen, "lines")).isEmpty(),
                       "tab content " + i);
                 }
-                click(360, 206);
+                click(320, 206);
                 scroll(400, 265, -1);
                 require((int) field(screen, "detailOffset") == 3, "details scroll");
                 screen.resize(client, screen.width, screen.height);
@@ -227,7 +268,68 @@ public final class SmokeClient implements ClientModInitializer {
                 require((int) field(screen, "listOffset") == 3, "species list scroll");
                 screen.resize(client, screen.width, screen.height);
                 require((int) field(screen, "listOffset") == 3, "resize preserves list position");
-                click(562, 30);
+                click(447, 206);
+                require(
+                    !((Map<?, ?>) field(screen, "moveRows")).isEmpty(),
+                    "egg moves share typed move cards");
+                stage = 7;
+                ticks = 0;
+              }
+              case 7 -> {
+                require(
+                    ((List<?>) field(screen, "lines"))
+                        .stream()
+                            .anyMatch(
+                                x ->
+                                    x.toString()
+                                        .contains(
+                                            client.options.language.equals("fr_fr")
+                                                ? "Végétal"
+                                                : "Grass")),
+                    "egg groups follow player language");
+                shot(client, "wiki-breeding");
+                var search =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
+                search.setText("");
+                click(157, 98);
+                require((int) field(screen, "generation") == 1, "generation filter advances");
+                require(
+                    ((List<com.cobblemon.mod.common.pokemon.Species>) field(screen, "filtered"))
+                        .stream().allMatch(p -> p.getNationalPokedexNumber() <= 151),
+                    "generation filter excludes other generations");
+                search.setText("#152");
+                require(field(screen, "selected") == null, "search and generation compose");
+                click(157, 98);
+                require(
+                    field(screen, "selected") != null,
+                    "changing generation restores matching search");
+                click(40, 98);
+                click(40, 98);
+                search.setText("#1");
+                var dex =
+                    com.cobblemon.mod.common.client.CobblemonClient.INSTANCE.getClientPokedexData();
+                var species = (com.cobblemon.mod.common.pokemon.Species) field(screen, "selected");
+                var record = dex.getOrCreateSpeciesRecord(species.getResourceIdentifier());
+                var formRecord = record.getOrCreateFormRecord(species.getStandardForm().getName());
+                formRecord.setKnowledgeProgress(
+                    com.cobblemon.mod.common.api.pokedex.PokedexEntryProgress.SEEN);
+                require(
+                    dex.getHighestKnowledgeForSpecies(species.getResourceIdentifier())
+                        == com.cobblemon.mod.common.api.pokedex.PokedexEntryProgress.SEEN,
+                    "seen does not imply captured");
+                formRecord.setKnowledgeProgress(
+                    com.cobblemon.mod.common.api.pokedex.PokedexEntryProgress.OWNED);
+                require(
+                    dex.getHighestKnowledgeForSpecies(species.getResourceIdentifier())
+                        == com.cobblemon.mod.common.api.pokedex.PokedexEntryProgress.OWNED,
+                    "synthetic captured state is available");
+                hover(client, 157, 132);
+                stage = 8;
+                ticks = 0;
+              }
+              case 8 -> {
+                shot(client, "wiki-captured");
+                click(554, 30);
                 require(client.currentScreen == null, "close button");
                 done(client);
               }
@@ -239,6 +341,15 @@ public final class SmokeClient implements ClientModInitializer {
             stage = 99;
           }
         });
+  }
+
+  void hover(MinecraftClient client, int x, int y) {
+    var wiki = (WikiScreen) screen;
+    var window = client.getWindow();
+    org.lwjgl.glfw.GLFW.glfwSetCursorPos(
+        window.getHandle(),
+        (wiki.left + x * wiki.scale) * window.getWidth() / screen.width,
+        (wiki.top + y * wiki.scale) * window.getHeight() / screen.height);
   }
 
   void click(int x, int y) {

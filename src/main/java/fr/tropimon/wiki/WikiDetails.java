@@ -22,6 +22,13 @@ final class WikiDetails {
     return unique.values().stream().sorted(Comparator.comparing(Ability::hidden)).toList();
   }
 
+  static int generation(int number) {
+    int[] last = {151, 251, 386, 493, 649, 721, 809, 905, 1025};
+    if (number <= 0) return 0;
+    for (int i = 0; i < last.length; i++) if (number <= last[i]) return i + 1;
+    return 0;
+  }
+
   static String value(JsonObject object, String key, String fallback) {
     JsonElement value = object.get(key);
     return value == null || value.isJsonNull()
@@ -40,17 +47,18 @@ final class WikiDetails {
     String method = value(evolution, "variant", "unknown");
     lines.add(
         switch (method) {
-          case "level_up" -> "Monter d'un niveau";
-          case "item_interact" -> "Utiliser : " + item(evolution.get("requiredContext"), name);
+          case "level_up" -> name.apply("ui", "evolution.level_up");
+          case "item_interact" ->
+              name.apply("ui", "evolution.use") + item(evolution.get("requiredContext"), name);
           case "trade" ->
-              "Échanger ce Pokémon"
+              name.apply("ui", "evolution.trade")
                   + (evolution.has("requiredContext")
                           && !evolution.get("requiredContext").isJsonNull()
                           && !value(evolution, "requiredContext", "").isBlank()
-                      ? " contre "
+                      ? name.apply("ui", "evolution.trade_for")
                           + name.apply("properties", value(evolution, "requiredContext", ""))
                       : "");
-          default -> "Méthode spéciale : " + method;
+          default -> name.apply("ui", "evolution.special") + method;
         });
     var requirements = evolution.getAsJsonArray("requirements");
     if (requirements != null)
@@ -58,7 +66,7 @@ final class WikiDetails {
         if (entry.isJsonObject()) lines.addAll(requirement(entry.getAsJsonObject(), name));
       }
     if (Boolean.parseBoolean(value(evolution, "consumeHeldItem", "false")))
-      lines.add("L'objet tenu est consommé.");
+      lines.add(name.apply("ui", "evolution.consume"));
     return lines;
   }
 
@@ -69,92 +77,124 @@ final class WikiDetails {
           case "level" -> {
             String min = value(r, "minLevel", "1"), max = value(r, "maxLevel", "2147483647");
             yield max.equals("2147483647")
-                ? "Niveau " + min + " minimum"
-                : "Niveau entre " + min + " et " + max;
+                ? name.apply("ui", "level") + min + name.apply("ui", "evolution.minimum")
+                : name.apply("ui", "evolution.level_range")
+                    + min
+                    + name.apply("ui", "evolution.and")
+                    + max;
           }
-          case "friendship" -> "Amitié : " + value(r, "amount", "?") + " minimum";
-          case "held_item" -> "Tenir : " + item(r.get("itemCondition"), name);
-          case "has_move" -> "Connaître : " + name.apply("move", value(r, "move", "?"));
+          case "friendship" ->
+              name.apply("ui", "evolution.friendship")
+                  + value(r, "amount", "?")
+                  + name.apply("ui", "evolution.minimum");
+          case "held_item" ->
+              name.apply("ui", "evolution.hold") + item(r.get("itemCondition"), name);
+          case "has_move" ->
+              name.apply("ui", "evolution.know") + name.apply("move", value(r, "move", "?"));
           case "has_move_type" ->
-              "Connaître une attaque de type " + name.apply("type", value(r, "type", "?"));
+              name.apply("ui", "evolution.know_type") + name.apply("type", value(r, "type", "?"));
           case "time_range" ->
-              "Moment : "
+              name.apply("ui", "evolution.time")
                   + switch (value(r, "range", "?")) {
-                    case "day" -> "jour";
-                    case "night" -> "nuit";
-                    case "dusk" -> "crépuscule";
-                    case "dawn" -> "aube";
+                    case "day" -> name.apply("ui", "time.day");
+                    case "night" -> name.apply("ui", "time.night");
+                    case "dusk" -> name.apply("ui", "time.dusk");
+                    case "dawn" -> name.apply("ui", "time.dawn");
                     default -> value(r, "range", "?");
                   };
           case "stat_compare" ->
               name.apply("stat", value(r, "highStat", "?"))
-                  + " supérieure à "
+                  + name.apply("ui", "evolution.higher")
                   + name.apply("stat", value(r, "lowStat", "?"));
           case "stat_equal" ->
               name.apply("stat", value(r, "statOne", "?"))
-                  + " égale à "
+                  + name.apply("ui", "evolution.equal")
                   + name.apply("stat", value(r, "statTwo", "?"));
           case "properties" ->
-              "Caractéristiques requises : " + name.apply("properties", value(r, "target", "?"));
+              name.apply("ui", "evolution.properties")
+                  + name.apply("properties", value(r, "target", "?"));
           case "party_member" ->
               (value(r, "contains", "true").equals("false")
-                      ? "Ne pas avoir dans l'équipe : "
-                      : "Dans l'équipe : ")
+                      ? name.apply("ui", "evolution.party_not")
+                      : name.apply("ui", "evolution.party"))
                   + name.apply("properties", value(r, "target", "?"));
           case "moon_phase" ->
-              "Phase lunaire : "
+              name.apply("ui", "evolution.moon")
                   + (value(r, "moonPhase", "?").equals("FULL_MOON")
-                      ? "pleine lune"
+                      ? name.apply("ui", "evolution.fullmoon")
                       : value(r, "moonPhase", "?"));
           case "property_range" ->
-              "Progression " + value(r, "feature", "?") + " : " + value(r, "range", "?");
+              name.apply("ui", "evolution.progress")
+                  + value(r, "feature", "?")
+                  + " : "
+                  + value(r, "range", "?");
           case "use_move" ->
-              "Utiliser "
+              name.apply("ui", "evolution.use_move")
                   + name.apply("move", value(r, "move", "?"))
                   + " : "
                   + value(r, "amount", "?")
-                  + " fois";
+                  + name.apply("ui", "evolution.times");
           case "battle_critical_hits" ->
-              "Réussir " + value(r, "amount", "?") + " coups critiques dans un combat";
+              name.apply("ui", "evolution.critical")
+                  + value(r, "amount", "?")
+                  + name.apply("ui", "evolution.critical_end");
           case "blocks_traveled" ->
-              "Parcourir " + value(r, "amount", "?") + " blocs avec ce Pokémon";
-          case "damage_taken" -> "Subir " + value(r, "amount", "?") + " points de dégâts";
-          case "recoil" -> "Cumuler " + value(r, "amount", "?") + " points de dégâts de recul";
+              name.apply("ui", "evolution.walk")
+                  + value(r, "amount", "?")
+                  + name.apply("ui", "evolution.walk_end");
+          case "damage_taken" ->
+              name.apply("ui", "evolution.damage")
+                  + value(r, "amount", "?")
+                  + name.apply("ui", "evolution.damage_end");
+          case "recoil" ->
+              name.apply("ui", "evolution.recoil")
+                  + value(r, "amount", "?")
+                  + name.apply("ui", "evolution.recoil_end");
           case "defeat" ->
-              "Vaincre "
+              name.apply("ui", "evolution.defeat")
                   + value(r, "amount", "?")
                   + " × "
                   + name.apply("properties", value(r, "target", "?"));
-          case "advancement" -> "Accomplir le progrès : " + value(r, "requiredAdvancement", "?");
+          case "advancement" ->
+              name.apply("ui", "evolution.advancement") + value(r, "requiredAdvancement", "?");
           default -> null;
         };
     if (line != null) return List.of(line);
     if (variant.equals("biome")) {
       List<String> lines = new ArrayList<>();
-      if (r.has("biomeCondition")) lines.add("Biome requis : " + value(r, "biomeCondition", "?"));
+      if (r.has("biomeCondition"))
+        lines.add(name.apply("ui", "evolution.biome") + value(r, "biomeCondition", "?"));
       if (r.has("biomeAnticondition"))
-        lines.add("Hors du biome : " + value(r, "biomeAnticondition", "?"));
+        lines.add(name.apply("ui", "evolution.not_biome") + value(r, "biomeAnticondition", "?"));
       if (!lines.isEmpty()) return lines;
     }
     if (variant.equals("weather")) {
       List<String> weather = new ArrayList<>();
       if (r.has("isRaining"))
-        weather.add(r.get("isRaining").getAsBoolean() ? "Sous la pluie" : "Sans pluie");
+        weather.add(
+            r.get("isRaining").getAsBoolean()
+                ? name.apply("ui", "evolution.rain")
+                : name.apply("ui", "evolution.no_rain"));
       if (r.has("isThundering"))
-        weather.add(r.get("isThundering").getAsBoolean() ? "Pendant un orage" : "Sans orage");
+        weather.add(
+            r.get("isThundering").getAsBoolean()
+                ? name.apply("ui", "evolution.thunder")
+                : name.apply("ui", "evolution.no_thunder"));
       if (!weather.isEmpty()) return weather;
     }
     if (variant.equals("structure")) {
       List<String> structures = new ArrayList<>();
       if (r.has("structureCondition"))
-        structures.add("Dans la structure : " + value(r, "structureCondition", "?"));
+        structures.add(
+            name.apply("ui", "evolution.structure") + value(r, "structureCondition", "?"));
       if (r.has("structureAnticondition"))
-        structures.add("Hors de la structure : " + value(r, "structureAnticondition", "?"));
+        structures.add(
+            name.apply("ui", "evolution.not_structure") + value(r, "structureAnticondition", "?"));
       if (!structures.isEmpty()) return structures;
     }
     // Unknown extensions remain visible; never silently drop a condition or imply it is satisfied.
     List<String> fallback = new ArrayList<>();
-    fallback.add("Condition avancée : " + variant);
+    fallback.add(name.apply("ui", "evolution.advanced") + variant);
     for (var e : r.entrySet())
       if (!e.getKey().equals("variant"))
         fallback.add(
@@ -165,12 +205,13 @@ final class WikiDetails {
   }
 
   static String item(JsonElement predicate, BiFunction<String, String, String> name) {
-    if (predicate == null || predicate.isJsonNull()) return "objet non précisé";
+    if (predicate == null || predicate.isJsonNull())
+      return name.apply("ui", "evolution.item_unknown");
     if (predicate.isJsonPrimitive()) return name.apply("item", predicate.getAsString());
     if (predicate.isJsonArray()) {
       List<String> alternatives = new ArrayList<>();
       predicate.getAsJsonArray().forEach(entry -> alternatives.add(item(entry, name)));
-      return String.join(" ou ", alternatives);
+      return String.join(name.apply("ui", "evolution.or"), alternatives);
     }
     JsonObject object = predicate.getAsJsonObject();
     if (object.has("items")) {
@@ -181,6 +222,6 @@ final class WikiDetails {
           .forEach(e -> extra.add(e.getKey() + " : " + e.getValue()));
       return label + (extra.isEmpty() ? "" : " (" + String.join(", ", extra) + ")");
     }
-    return "objet avec conditions : " + object;
+    return name.apply("ui", "evolution.item_conditions") + object;
   }
 }

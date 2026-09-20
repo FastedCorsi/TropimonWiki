@@ -9,47 +9,25 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.*;
 import net.minecraft.util.*;
 
-/** Reads the loaded registry first. Local evolution references never masquerade as server rules. */
+/** Reads the loaded registry, with installed species definitions as an evolution fallback. */
 final class WikiData {
-  private final Map<String, String> french = new HashMap<>();
   private Map<String, Path> speciesFiles;
 
   record Evolutions(JsonArray entries, boolean local, boolean available) {}
 
-  WikiData() {
-    for (String namespace : List.of("minecraft", "cobblemon")) {
-      var resource =
-          MinecraftClient.getInstance()
-              .getResourceManager()
-              .getResource(Identifier.of(namespace, "lang/fr_fr.json"));
-      if (resource.isEmpty()) continue;
-      try (var reader = resource.get().getReader()) {
-        JsonParser.parseReader(reader)
-            .getAsJsonObject()
-            .entrySet()
-            .forEach(
-                e -> {
-                  if (e.getValue().isJsonPrimitive())
-                    french.put(e.getKey(), e.getValue().getAsString());
-                });
-      } catch (IOException | RuntimeException ignored) {
-        /* Loaded language remains the fallback. */
-      }
-    }
+  String ui(String key, Object... arguments) {
+    return Text.translatable("tropimon_wiki." + key, arguments).getString();
   }
 
   String tr(String key) {
-    return french.getOrDefault(key, Language.getInstance().get(key));
+    return Language.getInstance().get(key);
   }
 
   String text(Text text) {
-    if (text.getContent() instanceof TranslatableTextContent translated)
-      return tr(translated.getKey());
     return text.getString();
   }
 
@@ -58,6 +36,7 @@ final class WikiData {
   }
 
   String name(String kind, String id) {
+    if (kind.equals("ui")) return ui(id);
     if (kind.equals("properties")) {
       List<String> parts = new ArrayList<>();
       for (String part : id.split(" ")) {
@@ -76,12 +55,12 @@ final class WikiData {
                 case "species" -> name("species", property[1]);
                 case "gender" ->
                     property[1].equals("male")
-                        ? "mâle"
-                        : property[1].equals("female") ? "femelle" : property[1];
-                case "held_item" -> "tenant " + name("item", property[1]);
-                case "nickname" -> "surnom « " + property[1] + " »";
-                case "gimmighoul_coins" -> property[1] + " pièces de Mordudor";
-                case "form", "wolf_form" -> "forme " + property[1];
+                        ? ui("properties.male")
+                        : property[1].equals("female") ? ui("properties.female") : property[1];
+                case "held_item" -> ui("properties.held") + name("item", property[1]);
+                case "nickname" -> ui("properties.nickname") + property[1] + " »";
+                case "gimmighoul_coins" -> property[1] + ui("properties.coins");
+                case "form", "wolf_form" -> ui("properties.form") + property[1];
                 default -> property[0].replace('_', ' ') + " : " + property[1];
               });
       }

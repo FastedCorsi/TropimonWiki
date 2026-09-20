@@ -2,7 +2,10 @@ package fr.tropimon.wiki;
 
 import com.cobblemon.mod.common.api.drop.ItemDropEntry;
 import com.cobblemon.mod.common.api.moves.MoveTemplate;
+import com.cobblemon.mod.common.api.pokedex.PokedexEntryProgress;
+import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
+import com.cobblemon.mod.common.client.CobblemonClient;
 import com.cobblemon.mod.common.client.gui.TypeIcon;
 import com.cobblemon.mod.common.client.gui.summary.widgets.ModelWidget;
 import com.cobblemon.mod.common.pokemon.*;
@@ -17,20 +20,18 @@ import org.lwjgl.glfw.GLFW;
 /** Compact, read-only reference with explicit data provenance. */
 public final class WikiScreen extends InstrumentScreen {
   private static final int ACCENT = 0xFFE9DE8C;
-  static final int LIST_ROWS = 13, DETAIL_ROWS = 10, DETAIL_X = 187, TAB_Y = 198;
+  static final int LIST_ROWS = 12, DETAIL_ROWS = 10, DETAIL_X = 187, TAB_Y = 198;
   private static final Identifier POKE_BALL =
       Identifier.of("cobblemon", "textures/gui/pokedex/pokedex_screen_poke_ball.png");
   private static final Identifier PLATFORM =
       Identifier.of("cobblemon", "textures/gui/pokedex/platform_base.png");
-  private static final String[] TABS = {
-    "Profil", "Stats", "Talents", "Attaques", "Évoluer", "Élevage", "Butin"
-  };
+  private static final String[] TABS = {"profile", "stats", "moves", "evolve", "breeding", "drops"};
   private final List<Species> all;
   private final WikiData data = new WikiData();
   private List<Species> filtered = List.of();
   private Species selected;
   private FormData form;
-  private int listOffset, detailOffset, tab, formIndex;
+  private int listOffset, detailOffset, tab, formIndex, generation;
   private TextFieldWidget search;
   private ModelWidget portrait;
   private List<WikiDetails.Ability> abilities = List.of();
@@ -39,7 +40,13 @@ public final class WikiScreen extends InstrumentScreen {
   private final List<String> lines = new ArrayList<>();
   private final Map<Integer, Integer> statBars = new HashMap<>();
   private final Set<Integer> headings = new HashSet<>();
-  private final List<Integer> abilityOffsets = new ArrayList<>();
+  private final Map<Integer, MoveTemplate> moveRows = new HashMap<>();
+  private final Map<Integer, TypeIcon> moveIcons = new HashMap<>();
+  private final Map<Integer, Integer> indents = new HashMap<>();
+  private final List<EvolutionPreview> evolutionPreviews = new ArrayList<>();
+  private int paragraphX = 195;
+
+  private record EvolutionPreview(int row, int end, ModelWidget model) {}
 
   public WikiScreen() {
     super("Tropimon Wiki");
@@ -55,25 +62,30 @@ public final class WikiScreen extends InstrumentScreen {
   protected void init() {
     super.init();
     String old = search == null ? "" : search.getText();
-    int previousListOffset = listOffset;
+    int previousListOffset = listOffset, previousDetailOffset = detailOffset;
     boolean wasFocused = search != null && search.isFocused();
-    search =
-        new TextFieldWidget(textRenderer, 34, 68, 128, 12, Text.literal("Rechercher un Pokémon"));
+    search = new TextFieldWidget(textRenderer, 34, 68, 128, 12, Text.literal(data.ui("search")));
     search.setDrawsBackground(false);
     search.setEditableColor(WHITE);
     search.setMaxLength(80);
-    search.setPlaceholder(Text.literal("Nom ou numéro…"));
+    search.setPlaceholder(Text.literal(data.ui("search.hint")));
     search.setChangedListener(this::filter);
     search.setText(old);
     filter(old);
     listOffset = Math.clamp(previousListOffset, 0, Math.max(0, filtered.size() - LIST_ROWS));
     search.setFocused(wasFocused);
     updatePortrait();
+    rebuild();
+    detailOffset = Math.clamp(previousDetailOffset, 0, Math.max(0, lines.size() - DETAIL_ROWS));
   }
 
   private void filter(String query) {
     filtered =
         all.stream()
+            .filter(
+                s ->
+                    generation == 0
+                        || WikiDetails.generation(s.getNationalPokedexNumber()) == generation)
             .filter(
                 s ->
                     WikiSearch.matches(
@@ -108,7 +120,7 @@ public final class WikiScreen extends InstrumentScreen {
       int x = 309;
       for (var type : form.getTypes()) {
         typeIcons.add(new TypeIcon(x, 88, type, null, false, true, 0F, 0F, 1F));
-        x += 137;
+        x += 133;
       }
     }
     portrait =
@@ -133,13 +145,14 @@ public final class WikiScreen extends InstrumentScreen {
       lines.add("");
       return;
     }
-    for (var ordered : textRenderer.wrapLines(Text.literal(value), 364)) {
+    for (var ordered : textRenderer.wrapLines(Text.literal(value), 555 - paragraphX)) {
       StringBuilder s = new StringBuilder();
       ordered.accept(
           (i, style, cp) -> {
             s.appendCodePoint(cp);
             return true;
           });
+      indents.put(lines.size(), paragraphX);
       lines.add(s.toString());
     }
   }
@@ -153,23 +166,27 @@ public final class WikiScreen extends InstrumentScreen {
     lines.clear();
     statBars.clear();
     headings.clear();
-    abilityOffsets.clear();
+    moveRows.clear();
+    moveIcons.clear();
+    indents.clear();
+    evolutionPreviews.clear();
+    paragraphX = 195;
     detailOffset = 0;
     if (selected == null || textRenderer == null) return;
     switch (tab) {
       case 0 -> {
-        heading("À PROPOS DE " + data.species(selected));
+        heading(data.ui("about") + data.species(selected));
         for (String key : form.getPokedex()) paragraph(data.tr(key));
         paragraph("");
         paragraph(
-            "Taille : "
+            data.ui("height")
                 + WikiDetails.number(form.getHeight() / 10F)
-                + " m     Poids : "
+                + data.ui("weight")
                 + WikiDetails.number(form.getWeight() / 10F)
                 + " kg");
-        paragraph("Taux de capture : " + form.getCatchRate());
-        paragraph("Amitié de base : " + form.getBaseFriendship());
-        paragraph("Statistiques et EV : onglet Stats.");
+        paragraph(data.ui("catch_rate") + form.getCatchRate());
+        paragraph(data.ui("friendship") + form.getBaseFriendship());
+        paragraph(data.ui("stats.hint"));
       }
       case 1 -> {
         int total = 0;
@@ -182,7 +199,7 @@ public final class WikiScreen extends InstrumentScreen {
             }
         }
         paragraph("");
-        heading("TOTAL : " + total);
+        heading(data.ui("total") + total);
         String evs =
             String.join(
                 " · ",
@@ -195,153 +212,203 @@ public final class WikiScreen extends InstrumentScreen {
                                 + " "
                                 + data.name("stat", e.getKey().getShowdownId()))
                     .toList());
-        paragraph("EV gagnés : " + (evs.isEmpty() ? "aucun" : evs));
+        paragraph(data.ui("evs") + (evs.isEmpty() ? data.ui("none") : evs));
       }
       case 2 -> {
-        for (var ability : abilities) {
-          abilityOffsets.add(lines.size());
-          heading(
-              ability.name() + (ability.hidden() ? " — HA / Talent caché" : " — Talent normal"));
-          paragraph(ability.description());
-          paragraph("");
-        }
-        if (abilities.stream().noneMatch(WikiDetails.Ability::hidden))
-          paragraph("Aucun talent caché distinct pour cette forme.");
-      }
-      case 3 -> {
         var moves = form.getMoves();
         moves.getLevelUpMoves().entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
-            .forEach(e -> e.getValue().forEach(m -> move("Niveau " + e.getKey(), m)));
-        moves.getTmMoves().forEach(m -> move("CT", m));
-        moves.getEggMoves().forEach(m -> move("Reproduction", m));
-        moves.getTutorMoves().forEach(m -> move("Tuteur", m));
-        moves.getEvolutionMoves().forEach(m -> move("À l'évolution", m));
-        moves.getSpecialMoves().forEach(m -> move("Apprentissage spécial", m));
+            .forEach(e -> e.getValue().forEach(m -> move(data.ui("level") + e.getKey(), m)));
+        moves.getTmMoves().forEach(m -> move(data.ui("tm"), m));
+        moves.getEggMoves().forEach(m -> move(data.ui("egg_move.origin"), m));
+        moves.getTutorMoves().forEach(m -> move(data.ui("tutor"), m));
+        moves.getEvolutionMoves().forEach(m -> move(data.ui("on_evolution"), m));
+        moves.getSpecialMoves().forEach(m -> move(data.ui("special_move"), m));
       }
-      case 4 -> {
+      case 3 -> {
         var evolutions = data.evolutions(selected, form);
-        heading(
-            evolutions.local()
-                ? "RÉFÉRENCE : COBBLEMON INSTALLÉ"
-                : "ÉVOLUTIONS DU REGISTRE CHARGÉ");
-        if (evolutions.local()) paragraph("Le serveur peut modifier ces conditions.");
-        if (!evolutions.available())
-          paragraph("Cette forme n'a pas de référence locale disponible.");
-        else if (evolutions.entries().isEmpty())
-          paragraph("Aucune évolution définie pour cette forme dans cette référence.");
+        if (!evolutions.available()) paragraph(data.ui("evolution.unavailable"));
+        else if (evolutions.entries().isEmpty()) paragraph(data.ui("evolution.none"));
         for (var entry : evolutions.entries()) {
           var evolution = entry.getAsJsonObject();
-          paragraph("");
-          heading(
-              "→ "
-                  + data.name(
-                      "properties",
-                      WikiDetails.value(evolution, "result", "Destination inconnue")));
+          if (!lines.isEmpty()) paragraph("");
+          int row = lines.size();
+          paragraphX = 245;
+          String result = WikiDetails.value(evolution, "result", "?");
+          heading(data.name("properties", result));
           for (String condition : WikiDetails.evolution(evolution, data::name))
             paragraph("• " + condition);
+          while (lines.size() - row < 4) paragraph("");
+          try {
+            var pokemon = PokemonProperties.Companion.parse(result).asRenderablePokemon();
+            if (pokemon != null)
+              evolutionPreviews.add(
+                  new EvolutionPreview(
+                      row,
+                      lines.size(),
+                      new ModelWidget(
+                          0,
+                          0,
+                          (int) (46 * scale),
+                          (int) (44 * scale),
+                          pokemon,
+                          1.0F * scale,
+                          25F,
+                          0,
+                          false,
+                          false,
+                          15)));
+          } catch (RuntimeException unavailableModel) {
+            // Keep the destination and its conditions even if an extension has no model.
+          }
+          paragraphX = 195;
         }
       }
-      case 5 -> {
-        heading("REPRODUCTION");
+      case 4 -> {
+        heading(data.ui("breeding.title"));
         paragraph(
-            "Groupes d'œufs : "
+            data.ui("egg_groups")
                 + String.join(
                     ", ",
                     form.getEggGroups().stream()
                         .map(e -> eggGroup(e.getShowdownID()))
                         .sorted()
                         .toList()));
-        paragraph("Cycles d'œuf : " + selected.getEggCycles());
+        paragraph(data.ui("egg_cycles") + selected.getEggCycles());
         float ratio = form.getMaleRatio();
         paragraph(
             ratio < 0
-                ? "Sans sexe"
-                : "Mâles : "
+                ? data.ui("genderless")
+                : data.ui("male_ratio")
                     + WikiDetails.number(ratio * 100)
-                    + " %     Femelles : "
+                    + data.ui("female_ratio")
                     + WikiDetails.number((1 - ratio) * 100)
                     + " %");
-        paragraph("L'élevage dépend des fonctionnalités du serveur.");
+        paragraph(data.ui("breeding.server"));
         paragraph("");
-        if (form.getMoves().getEggMoves().isEmpty()) paragraph("Aucune attaque d'œuf renseignée.");
-        for (var move : form.getMoves().getEggMoves()) move("Attaque d'œuf", move);
+        if (form.getMoves().getEggMoves().isEmpty()) paragraph(data.ui("egg_move.none"));
+        for (var move : form.getMoves().getEggMoves()) move(data.ui("egg_move"), move);
       }
-      case 6 -> {
-        heading("BUTIN POSSIBLE");
-        paragraph("Les règles du serveur peuvent différer.");
+      case 5 -> {
+        heading(data.ui("drops.title"));
+        paragraph(data.ui("drops.server"));
         paragraph("");
         if (form.getDrops() == null || form.getDrops().getEntries().isEmpty())
-          paragraph("Aucun butin renseigné.");
+          paragraph(data.ui("drops.none"));
         else
           for (var drop : form.getDrops().getEntries()) {
             if (drop instanceof ItemDropEntry item) {
               heading(data.name("item", item.getItem().toString()));
               paragraph(
-                  "Quantité : "
+                  data.ui("quantity")
                       + (item.getQuantityRange() == null
                           ? item.getQuantity()
                           : item.getQuantityRange())
-                      + "     Chance : "
+                      + data.ui("chance")
                       + WikiDetails.number(item.getPercentage())
                       + " %");
               paragraph("");
-            } else paragraph("Butin spécial : " + drop.getClass().getSimpleName());
+            } else paragraph(data.ui("drops.special") + drop.getClass().getSimpleName());
           }
       }
     }
-    if (lines.isEmpty()) paragraph("Aucune donnée disponible.");
+    if (lines.isEmpty()) paragraph(data.ui("data.none"));
   }
 
-  private static String eggGroup(String id) {
-    return switch (id) {
-      case "monster" -> "Monstrueux";
-      case "water1" -> "Aquatique 1";
-      case "water2" -> "Aquatique 2";
-      case "water3" -> "Aquatique 3";
-      case "bug" -> "Insectoïde";
-      case "flying" -> "Aérien";
-      case "field" -> "Terrestre";
-      case "fairy" -> "Féerique";
-      case "grass" -> "Végétal";
-      case "humanlike" -> "Humanoïde";
-      case "mineral" -> "Minéral";
-      case "amorphous" -> "Amorphe";
-      case "ditto" -> "Métamorph";
-      case "dragon" -> "Draconique";
-      case "undiscovered" -> "Inconnu";
+  private String eggGroup(String id) {
+    return switch (id.toLowerCase(Locale.ROOT).replace(" ", "").replace("-", "")) {
+      case "monster" -> data.ui("egg.monster");
+      case "water1" -> data.ui("egg.water1");
+      case "water2" -> data.ui("egg.water2");
+      case "water3" -> data.ui("egg.water3");
+      case "bug" -> data.ui("egg.bug");
+      case "flying" -> data.ui("egg.flying");
+      case "field" -> data.ui("egg.field");
+      case "fairy" -> data.ui("egg.fairy");
+      case "grass" -> data.ui("egg.grass");
+      case "humanlike" -> data.ui("egg.humanlike");
+      case "mineral" -> data.ui("egg.mineral");
+      case "amorphous" -> data.ui("egg.amorphous");
+      case "ditto" -> data.ui("egg.ditto");
+      case "dragon" -> data.ui("egg.dragon");
+      case "undiscovered" -> data.ui("egg.undiscovered");
       default -> id;
     };
   }
 
   private void move(String origin, MoveTemplate move) {
+    int row = lines.size();
+    moveRows.put(row, move);
+    moveIcons.put(
+        row, new TypeIcon(196, 0, move.getElementalType(), null, false, true, 0F, 0F, 1F));
+    paragraphX = 213;
     heading(data.text(move.getDisplayName()) + " · " + origin);
+    paragraphX = 195;
     paragraph(
-        "Type "
-            + data.text(move.getElementalType().getDisplayName())
-            + "   Puiss. "
-            + (move.getPower() <= 0 ? "—" : WikiDetails.number(move.getPower()))
-            + "   Préc. "
-            + WikiDetails.number(move.getAccuracy())
-            + " %   PP "
-            + move.getPp());
+        data.ui(
+            "move.stats",
+            data.text(move.getElementalType().getDisplayName()),
+            move.getPower() <= 0 ? "—" : WikiDetails.number(move.getPower()),
+            move.getAccuracy() <= 0 ? "—" : WikiDetails.number(move.getAccuracy()) + " %",
+            move.getPp()));
     paragraph(data.text(move.getDescription()));
     paragraph("");
+  }
+
+  private PokedexEntryProgress knowledge(Species species) {
+    var dex = CobblemonClient.INSTANCE.getClientPokedexData();
+    return dex == null ? null : dex.getHighestKnowledgeForSpecies(species.getResourceIdentifier());
+  }
+
+  private String captureLabel(PokedexEntryProgress progress) {
+    return data.ui(
+        progress == null
+            ? "capture.unknown"
+            : progress == PokedexEntryProgress.OWNED
+                ? "capture.owned"
+                : progress == PokedexEntryProgress.SEEN ? "capture.seen" : "capture.unseen");
+  }
+
+  private void captureIcon(DrawContext c, int x, int y, PokedexEntryProgress progress) {
+    boolean caught = progress == PokedexEntryProgress.OWNED;
+    int color = caught ? 0xFFE66668 : progress == PokedexEntryProgress.SEEN ? MUTED : 0xFF65887B;
+    c.fill(x + 2, y, x + 8, y + 10, INK);
+    c.fill(x, y + 2, x + 10, y + 8, INK);
+    c.fill(x + 2, y + 1, x + 8, y + 4, color);
+    c.fill(x + 1, y + 2, x + 9, y + 4, color);
+    c.fill(x + 1, y + 6, x + 9, y + 8, caught ? WHITE : PANEL);
+    c.fill(x + 2, y + 8, x + 8, y + 9, caught ? WHITE : PANEL);
+    c.fill(x + 4, y + 4, x + 6, y + 6, WHITE);
+  }
+
+  private void clip(DrawContext c, int x, int y, int w, int h) {
+    c.enableScissor(
+        left + (int) (x * scale),
+        top + (int) (y * scale),
+        left + (int) ((x + w) * scale),
+        top + (int) ((y + h) * scale));
   }
 
   @Override
   public void render(DrawContext c, int mouseX, int mouseY, float delta) {
     int mx = localX(mouseX), my = localY(mouseY);
-    begin(c, ACCENT, "Tropimon Wiki", "Pokémon · Talents · Évolutions");
-    chip(c, "×", 552, 20, 20, false, hit(mx, my, 552, 20, 20, 21), ACCENT);
+    begin(c, ACCENT, "Tropimon Wiki", data.ui("subtitle"));
+    boolean closeHovered = hit(mx, my, 544, 20, 20, 21);
+    c.fill(544, 20, 564, 41, closeHovered ? 0xFF693B40 : PANEL);
+    label(c, "×", 551, 27, closeHovered ? 0xFFFF777A : WHITE);
     c.fill(27, 54, 174, 349, INK);
     c.fill(30, 63, 170, 84, search.isFocused() ? ACCENT : 0xFF6FA88C);
     c.fill(31, 64, 169, 83, PANEL);
     search.render(c, mx, my, delta);
-    label(c, filtered.size() + " Pokémon", 34, 91, MUTED);
+    chip(c, "‹", 30, 88, 20, false, hit(mx, my, 30, 88, 20, 21), ACCENT);
+    String generationLabel =
+        generation == 0 ? data.ui("generation.all") : data.ui("generation.number", generation);
+    label(c, generationLabel, 54, 95, MUTED);
+    chip(c, "›", 148, 88, 20, false, hit(mx, my, 148, 88, 20, 21), ACCENT);
+    label(c, filtered.size() + " Pokémon", 34, 113, MUTED);
     for (int i = 0; i < LIST_ROWS && listOffset + i < filtered.size(); i++) {
       var species = filtered.get(listOffset + i);
-      int y = 108 + i * 17;
+      int y = 130 + i * 16;
       boolean active = species == selected;
       boolean hovered = hit(mx, my, 30, y - 3, 137, 16);
       c.fill(30, y - 3, 167, y + 13, active ? 0xFFB9E4C3 : hovered ? 0xFF397C6C : PANEL);
@@ -352,20 +419,21 @@ public final class WikiScreen extends InstrumentScreen {
           36,
           y,
           active ? 0xFF366952 : MUTED);
-      label(c, textRenderer.trimToWidth(data.species(species), 96), 65, y, active ? INK : WHITE);
+      label(c, textRenderer.trimToWidth(data.species(species), 83), 65, y, active ? INK : WHITE);
+      captureIcon(c, 154, y - 1, knowledge(species));
     }
-    scrollbar(c, 169, 105, LIST_ROWS * 17, listOffset, filtered.size(), LIST_ROWS);
-    label(c, "↑ ↓  ·  Molette", 34, 335, MUTED);
+    scrollbar(c, 169, 127, LIST_ROWS * 16, listOffset, filtered.size(), LIST_ROWS);
+    label(c, data.ui("scroll"), 34, 335, MUTED);
     if (selected == null) {
       text(
           c,
-          all.isEmpty() ? "Entre dans un monde pour charger les espèces." : "Aucun Pokémon trouvé.",
+          all.isEmpty() ? data.ui("world.required") : data.ui("search.empty"),
           198,
           110,
           350,
           WHITE);
     } else {
-      c.fill(187, 54, 573, 78, INK);
+      c.fill(187, 54, 565, 78, INK);
       label(c, textRenderer.trimToWidth(data.species(selected), 295), 197, 62, WHITE);
       label(c, "#" + selected.getNationalPokedexNumber(), 531, 62, MUTED);
       c.fill(187, 81, 292, 169, 0xFF2C7D78);
@@ -374,39 +442,38 @@ public final class WikiScreen extends InstrumentScreen {
       c.drawTexture(PLATFORM, 197, 145, 85, 22, 0, 0, 113, 30, 113, 30);
       int typeX = 304;
       for (var type : form.getTypes()) {
-        c.fill(typeX, 84, typeX + 132, 105, INK);
-        c.fill(typeX, 103, typeX + 132, 105, 0xFF000000 | type.getPrimaryColor());
+        c.fill(typeX, 84, typeX + 128, 105, INK);
+        c.fill(typeX, 103, typeX + 128, 105, 0xFF000000 | type.getPrimaryColor());
         label(
             c,
             textRenderer.trimToWidth(data.text(type.getDisplayName()), 99),
             typeX + 26,
             91,
             WHITE);
-        typeX += 137;
+        typeX += 133;
       }
       typeIcons.forEach(icon -> icon.render(c));
-      label(c, "TALENTS", 304, 112, MUTED);
-      label(c, "Cliquer pour lire", 470, 112, MUTED);
+      label(c, data.ui("abilities"), 304, 112, MUTED);
+
       for (int i = 0; i < Math.min(3, abilities.size()); i++) {
         var ability = abilities.get(i);
         int y = 125 + i * 22;
-        c.fill(304, y, 573, y + 20, hit(mx, my, 304, y, 269, 20) ? 0xFF397C6C : PANEL);
-        label(c, textRenderer.trimToWidth(ability.name(), 175), 311, y + 6, WHITE);
-        c.fill(495, y + 3, 569, y + 17, ability.hidden() ? ACCENT : INK);
+        c.fill(304, y, 565, y + 20, hit(mx, my, 304, y, 261, 20) ? 0xFF397C6C : PANEL);
         label(
             c,
-            ability.hidden() ? "HA · Caché" : "Normal",
-            501,
+            textRenderer.trimToWidth(ability.name(), 246),
+            311,
             y + 6,
-            ability.hidden() ? INK : MUTED);
+            ability.hidden() ? ACCENT : 0xFFB9E4C3);
       }
-      if (abilities.isEmpty()) label(c, "Non renseigné", 311, 133, MUTED);
+      if (abilities.isEmpty()) label(c, data.ui("missing"), 311, 133, MUTED);
       boolean multiple = forms.size() > 1;
       int formX = multiple ? 211 : 187, formWidth = multiple ? 57 : 105;
       c.fill(formX, 173, formX + formWidth, 194, PANEL);
       String formName =
           textRenderer.trimToWidth(
-              form == selected.getStandardForm() ? "Standard" : form.getName(), formWidth - 8);
+              form == selected.getStandardForm() ? data.ui("standard") : form.getName(),
+              formWidth - 8);
       label(c, formName, formX + (formWidth - textRenderer.getWidth(formName)) / 2, 180, WHITE);
       if (multiple) {
         chip(c, "‹", 187, 173, 21, false, hit(mx, my, 187, 173, 21, 21), ACCENT);
@@ -415,30 +482,45 @@ public final class WikiScreen extends InstrumentScreen {
       for (int i = 0; i < TABS.length; i++)
         chip(
             c,
-            TABS[i],
-            DETAIL_X + i * 55,
+            data.ui("tab." + TABS[i]),
+            DETAIL_X + i * 63,
             TAB_Y,
-            53,
+            61,
             i == tab,
-            hit(mx, my, DETAIL_X + i * 55, TAB_Y, 53, 21),
+            hit(mx, my, DETAIL_X + i * 63, TAB_Y, 61, 21),
             ACCENT);
-      c.fill(187, 224, 573, 349, 0xFFE2F1E5);
+      c.fill(187, 224, 565, 349, 0xFFE2F1E5);
       for (int i = 0; i < DETAIL_ROWS && detailOffset + i < lines.size(); i++) {
         int index = detailOffset + i, y = 230 + i * 12;
-        if (headings.contains(index)) c.fill(192, y - 2, 566, y + 10, 0xFFBBDDC8);
+        if (headings.contains(index)) c.fill(192, y - 2, 558, y + 10, 0xFFBBDDC8);
         if (statBars.containsKey(index)) {
           int value = statBars.get(index);
           c.fill(340, y + 1, 524, y + 8, 0xFFB6D5C2);
           c.fill(340, y + 1, 340 + Math.clamp(value * 184 / 255, 0, 184), y + 8, 0xFF398971);
           label(c, Integer.toString(value), 537, y, INK);
         }
-        label(c, lines.get(index), 195, y, INK);
+        int textColor = INK;
+        if (moveRows.containsKey(index)) {
+          var move = moveRows.get(index);
+          int color = 0xFF000000 | move.getElementalType().getPrimaryColor();
+          c.fill(192, y - 2, 558, y + 10, INK);
+          c.fill(192, y - 2, 194, y + 10, color);
+          c.getMatrices().push();
+          c.getMatrices().translate(0, y - 1, 0);
+          moveIcons.get(index).render(c);
+          c.getMatrices().pop();
+          // Preserve type hue while keeping even dark types legible on the teal header.
+          int r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
+          textColor =
+              0xFF000000 | ((r * 3 / 5 + 102) << 16) | ((g * 3 / 5 + 102) << 8) | (b * 3 / 5 + 102);
+        }
+        label(c, lines.get(index), indents.getOrDefault(index, 195), y, textColor);
       }
-      scrollbar(c, 568, 229, 114, detailOffset, lines.size(), DETAIL_ROWS);
+      scrollbar(c, 560, 229, 114, detailOffset, lines.size(), DETAIL_ROWS);
       if (lines.size() > DETAIL_ROWS)
         label(
             c,
-            "Molette · "
+            data.ui("scroll.detail")
                 + (detailOffset + 1)
                 + "–"
                 + Math.min(detailOffset + DETAIL_ROWS, lines.size())
@@ -449,14 +531,45 @@ public final class WikiScreen extends InstrumentScreen {
             MUTED);
     }
     end(c);
-    if (portrait != null) portrait.render(c, mouseX, mouseY, delta);
+    if (portrait != null) {
+      clip(c, 190, 84, 99, 82);
+      portrait.render(c, mouseX, mouseY, delta);
+      c.disableScissor();
+    }
+    for (var preview : evolutionPreviews) {
+      if (preview.row() + 4 <= detailOffset || preview.row() >= detailOffset + DETAIL_ROWS)
+        continue;
+      var model = preview.model();
+      model.setX(left + (int) (196 * scale));
+      model.setY(top + (int) ((228 + (preview.row() - detailOffset) * 12) * scale));
+      clip(c, 192, 224, 49, 125);
+      model.render(c, mouseX, mouseY, delta);
+      c.disableScissor();
+    }
+    List<Text> tooltip = new ArrayList<>();
+    for (int i = 0; i < Math.min(3, abilities.size()); i++) {
+      if (hit(mx, my, 304, 125 + i * 22, 261, 20)) {
+        var ability = abilities.get(i);
+        tooltip.add(Text.literal(ability.name()).withColor(ability.hidden() ? ACCENT : 0xFFB9E4C3));
+        tooltip.add(Text.literal(ability.description()));
+      }
+    }
+    for (int i = 0; i < LIST_ROWS && listOffset + i < filtered.size(); i++)
+      if (hit(mx, my, 151, 127 + i * 16, 16, 16))
+        tooltip.add(Text.literal(captureLabel(knowledge(filtered.get(listOffset + i)))));
+    if (!tooltip.isEmpty()) {
+      List<net.minecraft.text.OrderedText> wrapped = new ArrayList<>();
+      for (Text text : tooltip)
+        wrapped.addAll(textRenderer.wrapLines(text, Math.min(260, width - 24)));
+      c.drawOrderedTooltip(textRenderer, wrapped, mouseX, mouseY);
+    }
   }
 
   @Override
   public boolean mouseClicked(double x, double y, int button) {
     int mx = localX(x), my = localY(y);
     if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return super.mouseClicked(x, y, button);
-    if (hit(mx, my, 552, 20, 20, 21)) {
+    if (hit(mx, my, 544, 20, 20, 21)) {
       close();
       return true;
     }
@@ -465,8 +578,13 @@ public final class WikiScreen extends InstrumentScreen {
       search.mouseClicked(mx, my, button);
       return true;
     }
-    if (hit(mx, my, 30, 105, 137, LIST_ROWS * 17)) {
-      int index = listOffset + (my - 105) / 17;
+    if (hit(mx, my, 30, 88, 20, 21) || hit(mx, my, 148, 88, 20, 21)) {
+      generation = Math.floorMod(generation + (mx < 50 ? -1 : 1), 10);
+      filter(search.getText());
+      return true;
+    }
+    if (hit(mx, my, 30, 127, 137, LIST_ROWS * 16)) {
+      int index = listOffset + (my - 127) / 16;
       if (index < filtered.size()) select(filtered.get(index));
       return true;
     }
@@ -480,15 +598,8 @@ public final class WikiScreen extends InstrumentScreen {
       return true;
     }
     if (selected != null) {
-      for (int i = 0; i < Math.min(3, abilities.size()); i++)
-        if (hit(mx, my, 304, 125 + i * 22, 269, 20)) {
-          tab = 2;
-          rebuild();
-          detailOffset = Math.min(abilityOffsets.get(i), Math.max(0, lines.size() - DETAIL_ROWS));
-          return true;
-        }
-      if (hit(mx, my, DETAIL_X, TAB_Y, 383, 21) && (mx - DETAIL_X) % 55 < 53) {
-        tab = Math.min(6, (mx - DETAIL_X) / 55);
+      if (hit(mx, my, DETAIL_X, TAB_Y, 378, 21) && (mx - DETAIL_X) % 63 < 61) {
+        tab = Math.min(5, (mx - DETAIL_X) / 63);
         rebuild();
         return true;
       }
@@ -502,7 +613,7 @@ public final class WikiScreen extends InstrumentScreen {
     int mx = localX(x), my = localY(y), change = vertical > 0 ? -3 : 3;
     if (hit(mx, my, 27, 54, 147, 295))
       listOffset = Math.clamp(listOffset + change, 0, Math.max(0, filtered.size() - LIST_ROWS));
-    else if (hit(mx, my, 187, 224, 386, 125))
+    else if (hit(mx, my, 187, 224, 378, 125))
       detailOffset = Math.clamp(detailOffset + change, 0, Math.max(0, lines.size() - DETAIL_ROWS));
     else return false;
     return true;

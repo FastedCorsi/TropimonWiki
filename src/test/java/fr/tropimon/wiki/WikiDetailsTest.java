@@ -95,7 +95,34 @@ class WikiDetailsTest {
     assertTrue(lines.contains("Pendant un orage"));
   }
 
+  private String french(String key) {
+    try (var reader =
+        new java.io.InputStreamReader(
+            getClass().getResourceAsStream("/assets/tropimon_wiki/lang/fr_fr.json"),
+            java.nio.charset.StandardCharsets.UTF_8)) {
+      return JsonParser.parseReader(reader)
+          .getAsJsonObject()
+          .get("tropimon_wiki." + key)
+          .getAsString();
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  @Test
+  void generationBoundariesDoNotAssignCustomSpecies() {
+    assertEquals(1, WikiDetails.generation(151));
+    assertEquals(2, WikiDetails.generation(152));
+    assertEquals(7, WikiDetails.generation(809));
+    assertEquals(8, WikiDetails.generation(810));
+    assertEquals(9, WikiDetails.generation(1025));
+    assertEquals(0, WikiDetails.generation(1026));
+    assertEquals(0, WikiDetails.generation(0));
+  }
+
   private List<String> evolution(String json) {
-    return WikiDetails.evolution(JsonParser.parseString(json).getAsJsonObject(), (kind, id) -> id);
+    return WikiDetails.evolution(
+        JsonParser.parseString(json).getAsJsonObject(),
+        (kind, id) -> kind.equals("ui") ? french(id) : id);
   }
 }
