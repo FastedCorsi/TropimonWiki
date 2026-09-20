@@ -95,6 +95,25 @@ class WikiDetailsTest {
     assertTrue(lines.contains("Pendant un orage"));
   }
 
+  @Test
+  void baseStatColorsFollowRedYellowGreenAndClamp() {
+    assertEquals(0xFFFF5555, WikiDetails.statColor(40));
+    assertEquals(0xFFFFFF55, WikiDetails.statColor(90));
+    assertEquals(0xFF55FF55, WikiDetails.statColor(140));
+    assertEquals(WikiDetails.statColor(40), WikiDetails.statColor(1));
+    assertEquals(WikiDetails.statColor(140), WikiDetails.statColor(255));
+    assertNotEquals(WikiDetails.statColor(65), WikiDetails.statColor(115));
+  }
+
+  @Test
+  void moveSearchAcceptsTranslationIdAndTypeWithoutAccents() {
+    assertTrue(WikiSearch.matchesMove("ecLAIR", "Éclair", "thundershock", "Électrik"));
+    assertTrue(WikiSearch.matchesMove("thunder", "Éclair", "thundershock", "Électrik"));
+    assertTrue(WikiSearch.matchesMove("electrik", "Éclair", "thundershock", "Électrik"));
+    assertTrue(WikiSearch.matchesMove("", "Éclair", "thundershock", "Électrik"));
+    assertFalse(WikiSearch.matchesMove("plante", "Éclair", "thundershock", "Électrik"));
+  }
+
   private String french(String key) {
     try (var reader =
         new java.io.InputStreamReader(

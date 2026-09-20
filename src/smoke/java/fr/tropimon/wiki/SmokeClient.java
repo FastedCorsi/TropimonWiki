@@ -72,8 +72,8 @@ public final class SmokeClient implements ClientModInitializer {
                 client.setScreen(screen);
                 var wiki = (WikiScreen) screen;
                 require(
-                    wiki.scale <= 1F && InstrumentScreen.H * wiki.scale <= screen.height * 0.781F,
-                    "compact window keeps vertical margins");
+                    wiki.scale <= 1F && InstrumentScreen.H * wiki.scale <= screen.height - 15F && InstrumentScreen.W * wiki.scale <= screen.width - 15F,
+                    "frame stays inside screen margins");
                 require(
                     screen.getTitle().getString().equals("Tropimon Wiki"), "Wiki product title");
                 require(
@@ -256,11 +256,57 @@ public final class SmokeClient implements ClientModInitializer {
                 screen.resize(client, screen.width, screen.height);
                 require(
                     (int) field(screen, "detailOffset") == 3, "resize preserves reading position");
+                var moveSearch =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch");
+                click(250, 236);
+                require(
+                    moveSearch.isFocused() && !search.isFocused(),
+                    "move search has independent focus");
+                screen.charTyped('v', 0);
+                require(
+                    moveSearch.getText().equals("v") && search.getText().equals("#1"),
+                    "typing moves leaves species search unchanged");
+                moveSearch.setText("not-a-real-move");
+                require(
+                    ((Map<?, ?>) field(screen, "moveRows")).isEmpty(),
+                    "no matching move clears cards");
+                moveSearch.setText("vinewhip");
+                require(
+                    !((Map<?, ?>) field(screen, "moveRows")).isEmpty(),
+                    "technical move name is searchable");
+                require(
+                    ((Map<?, ?>) field(screen, "moveRows"))
+                        .values().stream()
+                            .allMatch(
+                                m ->
+                                    ((com.cobblemon.mod.common.api.moves.MoveTemplate) m)
+                                        .getName()
+                                        .equals("vinewhip")),
+                    "only matching moves remain");
+                require(
+                    (int) field(screen, "detailOffset") == 0, "move query resets detail scroll");
+                screen.resize(client, screen.width, screen.height);
+                moveSearch =
+                    (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch");
+                require(
+                    moveSearch.getText().equals("vinewhip") && moveSearch.isFocused(),
+                    "move filter survives resize");
+                moveSearch.setText(
+                    client.options.language.equals("fr_fr") ? "fouet lianes" : "vine whip");
+                require(
+                    !((Map<?, ?>) field(screen, "moveRows")).isEmpty(), "translated move search");
+                hover(client, 350, 238);
                 stage = 6;
                 ticks = 0;
               }
               case 6 -> {
                 shot(client, "wiki-moves");
+                click(550, 236);
+                require(
+                    ((net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch"))
+                        .getText()
+                        .isEmpty(),
+                    "clear move filter");
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
                 search.setText("");
@@ -348,19 +394,27 @@ public final class SmokeClient implements ClientModInitializer {
     var window = client.getWindow();
     org.lwjgl.glfw.GLFW.glfwSetCursorPos(
         window.getHandle(),
-        (wiki.left + x * wiki.scale) * window.getWidth() / screen.width,
+        (wiki.left + (x + InstrumentScreen.CONTENT_OFFSET_X) * wiki.scale)
+            * window.getWidth()
+            / screen.width,
         (wiki.top + y * wiki.scale) * window.getHeight() / screen.height);
   }
 
   void click(int x, int y) {
     var wiki = (WikiScreen) screen;
-    screen.mouseClicked(wiki.left + (x + 0.5) * wiki.scale, wiki.top + (y + 0.5) * wiki.scale, 0);
+    screen.mouseClicked(
+        wiki.left + (x + 0.5 + InstrumentScreen.CONTENT_OFFSET_X) * wiki.scale,
+        wiki.top + (y + 0.5) * wiki.scale,
+        0);
   }
 
   void scroll(int x, int y, double amount) {
     var wiki = (WikiScreen) screen;
     screen.mouseScrolled(
-        wiki.left + (x + 0.5) * wiki.scale, wiki.top + (y + 0.5) * wiki.scale, 0, amount);
+        wiki.left + (x + 0.5 + InstrumentScreen.CONTENT_OFFSET_X) * wiki.scale,
+        wiki.top + (y + 0.5) * wiki.scale,
+        0,
+        amount);
   }
 
   static Object field(Object instance, String name) throws Exception {

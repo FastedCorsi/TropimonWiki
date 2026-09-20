@@ -1,10 +1,10 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.4
+By FastedCorsi — 0.1.6
 
 **F7** : Tropimon Wiki (touche reconfigurable).
 
-Fenêtre compacte centrée, limitée à 80 % de la largeur et 78 % de la hauteur, sans agrandissement au-delà de son échelle native. Titre Tropimon Wiki, pied de page dégagé et navigation des formes seulement lorsqu'il en existe plusieurs. Position de lecture conservée au redimensionnement.
+Fenêtre centrée avec une marge minimale de huit pixels logiques sur chaque bord de l’écran, sans agrandissement au-delà de son échelle native. Titre Tropimon Wiki, pied de page dégagé et navigation des formes seulement lorsqu'il en existe plusieurs. Position de lecture conservée au redimensionnement.
 
 Interface au style Cobblemon / Tropimon : cadre vert du Pokédex Cobblemon, panneaux turquoise, accents sable, icônes de types natives, boutons au survol et jauges de statistiques. Flèches pour parcourir les formes dans les deux sens, indicateurs de défilement et bouton de fermeture. Les textures sont chargées depuis Cobblemon, sans être redistribuées.
 
@@ -27,9 +27,9 @@ Le build local identifie l'unique JAR Cobblemon par fabric.mod.json, même si so
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.4/local` et `build/release/0.1.4/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.6/local` et `build/release/0.1.6/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
 
-L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Le nouvel updater prend aussi en charge les deux copies et le suivi du stockage géré, sans dépendance à un autre mod. Les anciennes versions déjà distribuées ne sont pas réparées rétroactivement. Vérification asynchrone au démarrage, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
+L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Le nouvel updater prend aussi en charge les deux copies et le suivi du stockage géré, sans dépendance à un autre mod. Les anciennes versions déjà distribuées ne sont pas réparées rétroactivement. Vérification asynchrone au démarrage uniquement après consentement explicite, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 
 ## Périmètre de la première version
 
@@ -47,3 +47,5 @@ Après accord et vérification, un installateur local utilise le Java de Minecra
 Pour modifier le choix en jeu : `/tropimonupdates tropimon_wiki`. Refuser laisse le mod utilisable. Les anciennes versions dont l'updater est défectueux nécessitent un premier remplacement manuel, jeu fermé. L'accord donné pour ce mod ne s'applique pas aux autres mods. Les tests automatisés sont exécutés sous Windows ; les autres systèmes doivent encore être validés en situation réelle.
 
 Les versions à consentement utilisent un canal de releases distinct du lien GitHub « latest » historique : sélectionner la version par son tag. Cela évite de déclencher les anciens updaters sans accord.
+
+Les marges intérieures sont centrées dans l’ouverture du cadre natif, sans fond rectangulaire extérieur. Les onglets Attaques et Élevage disposent d’un filtre local par nom traduit, identifiant technique ou type. Il conserve la recherche de Pokémon et se vide avec sa croix. Les barres de statistiques de base reprennent le dégradé rouge → jaune → vert : rouge à 40 ou moins, jaune à 90, vert à 140 ou plus ; les valeurs exactes restent affichées.

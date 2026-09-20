@@ -20,7 +20,7 @@ import org.lwjgl.glfw.GLFW;
 /** Compact, read-only reference with explicit data provenance. */
 public final class WikiScreen extends InstrumentScreen {
   private static final int ACCENT = 0xFFE9DE8C;
-  static final int LIST_ROWS = 12, DETAIL_ROWS = 10, DETAIL_X = 187, TAB_Y = 198;
+  static final int LIST_ROWS = 12, DETAIL_ROWS = 9, DETAIL_X = 187, TAB_Y = 198;
   private static final Identifier POKE_BALL =
       Identifier.of("cobblemon", "textures/gui/pokedex/pokedex_screen_poke_ball.png");
   private static final Identifier PLATFORM =
@@ -32,7 +32,7 @@ public final class WikiScreen extends InstrumentScreen {
   private Species selected;
   private FormData form;
   private int listOffset, detailOffset, tab, formIndex, generation;
-  private TextFieldWidget search;
+  private TextFieldWidget search, moveSearch;
   private ModelWidget portrait;
   private List<WikiDetails.Ability> abilities = List.of();
   private final List<TypeIcon> typeIcons = new ArrayList<>();
@@ -71,12 +71,24 @@ public final class WikiScreen extends InstrumentScreen {
     search.setPlaceholder(Text.literal(data.ui("search.hint")));
     search.setChangedListener(this::filter);
     search.setText(old);
+    String oldMoveQuery = moveSearch == null ? "" : moveSearch.getText();
+    boolean moveFocused = moveSearch != null && moveSearch.isFocused();
+    moveSearch =
+        new TextFieldWidget(textRenderer, 196, 231, 345, 12, Text.literal(data.ui("moves.search")));
+    moveSearch.setDrawsBackground(false);
+    moveSearch.setEditableColor(INK);
+    moveSearch.setMaxLength(80);
+    moveSearch.setPlaceholder(Text.literal(data.ui("moves.search")));
+    moveSearch.setText(oldMoveQuery);
+    moveSearch.setChangedListener(value -> rebuild());
+    moveSearch.setFocused(moveFocused && hasMoveSearch());
     filter(old);
     listOffset = Math.clamp(previousListOffset, 0, Math.max(0, filtered.size() - LIST_ROWS));
     search.setFocused(wasFocused);
     updatePortrait();
     rebuild();
-    detailOffset = Math.clamp(previousDetailOffset, 0, Math.max(0, lines.size() - DETAIL_ROWS));
+    detailOffset =
+        Math.clamp(previousDetailOffset, 0, Math.max(0, lines.size() - visibleDetailRows()));
   }
 
   private void filter(String query) {
@@ -127,7 +139,7 @@ public final class WikiScreen extends InstrumentScreen {
         selected == null
             ? null
             : new ModelWidget(
-                left + (int) (190 * scale),
+                left + (int) ((190 + CONTENT_OFFSET_X) * scale),
                 top + (int) (82 * scale),
                 (int) (100 * scale),
                 (int) (86 * scale),
@@ -312,7 +324,9 @@ public final class WikiScreen extends InstrumentScreen {
           }
       }
     }
-    if (lines.isEmpty()) paragraph(data.ui("data.none"));
+    if (hasMoveSearch() && moveSearch != null && !moveSearch.getText().isBlank() && moveRows.isEmpty())
+      paragraph(data.ui("moves.empty"));
+    else if (lines.isEmpty()) paragraph(data.ui("data.none"));
   }
 
   private String eggGroup(String id) {
@@ -336,7 +350,25 @@ public final class WikiScreen extends InstrumentScreen {
     };
   }
 
+  private boolean hasMoveSearch() {
+    return tab == 2 || tab == 4;
+  }
+
+  private int visibleDetailRows() {
+    return hasMoveSearch() ? 7 : DETAIL_ROWS;
+  }
+
+  private int detailY() {
+    return hasMoveSearch() ? 252 : 230;
+  }
+
   private void move(String origin, MoveTemplate move) {
+    if (moveSearch != null
+        && !WikiSearch.matchesMove(
+            moveSearch.getText(),
+            data.text(move.getDisplayName()),
+            move.getName(),
+            data.text(move.getElementalType().getDisplayName()))) return;
     int row = lines.size();
     moveRows.put(row, move);
     moveIcons.put(
@@ -383,9 +415,9 @@ public final class WikiScreen extends InstrumentScreen {
 
   private void clip(DrawContext c, int x, int y, int w, int h) {
     c.enableScissor(
-        left + (int) (x * scale),
+        left + (int) ((x + CONTENT_OFFSET_X) * scale),
         top + (int) (y * scale),
-        left + (int) ((x + w) * scale),
+        left + (int) ((x + w + CONTENT_OFFSET_X) * scale),
         top + (int) ((y + h) * scale));
   }
 
@@ -393,10 +425,10 @@ public final class WikiScreen extends InstrumentScreen {
   public void render(DrawContext c, int mouseX, int mouseY, float delta) {
     int mx = localX(mouseX), my = localY(mouseY);
     begin(c, ACCENT, "Tropimon Wiki", data.ui("subtitle"));
-    boolean closeHovered = hit(mx, my, 544, 20, 20, 21);
-    c.fill(544, 20, 564, 41, closeHovered ? 0xFF693B40 : PANEL);
-    label(c, "×", 551, 27, closeHovered ? 0xFFFF777A : WHITE);
-    c.fill(27, 54, 174, 349, INK);
+    boolean closeHovered = hit(mx, my, 544, 25, 20, 21);
+    c.fill(544, 25, 564, 46, closeHovered ? 0xFF693B40 : PANEL);
+    label(c, "×", 551, 32, closeHovered ? 0xFFFF777A : WHITE);
+    c.fill(27, 54, 174, 341, INK);
     c.fill(30, 63, 170, 84, search.isFocused() ? ACCENT : 0xFF6FA88C);
     c.fill(31, 64, 169, 83, PANEL);
     search.render(c, mx, my, delta);
@@ -423,7 +455,7 @@ public final class WikiScreen extends InstrumentScreen {
       captureIcon(c, 154, y - 1, knowledge(species));
     }
     scrollbar(c, 169, 127, LIST_ROWS * 16, listOffset, filtered.size(), LIST_ROWS);
-    label(c, data.ui("scroll"), 34, 335, MUTED);
+    label(c, data.ui("scroll"), 34, 327, MUTED);
     if (selected == null) {
       text(
           c,
@@ -489,14 +521,26 @@ public final class WikiScreen extends InstrumentScreen {
             i == tab,
             hit(mx, my, DETAIL_X + i * 63, TAB_Y, 61, 21),
             ACCENT);
-      c.fill(187, 224, 565, 349, 0xFFE2F1E5);
-      for (int i = 0; i < DETAIL_ROWS && detailOffset + i < lines.size(); i++) {
-        int index = detailOffset + i, y = 230 + i * 12;
+      c.fill(187, 224, 565, 341, 0xFFE2F1E5);
+      if (hasMoveSearch()) {
+        c.fill(192, 227, 558, 246, moveSearch.isFocused() ? 0xFF398971 : 0xFF83AF99);
+        c.fill(193, 228, 557, 245, 0xFFF2FFF4);
+        moveSearch.render(c, mx, my, delta);
+        if (!moveSearch.getText().isEmpty())
+          label(c, "×", 547, 232, hit(mx, my, 544, 227, 14, 19) ? 0xFFAF3644 : INK);
+      }
+      for (int i = 0; i < visibleDetailRows() && detailOffset + i < lines.size(); i++) {
+        int index = detailOffset + i, y = detailY() + i * 12;
         if (headings.contains(index)) c.fill(192, y - 2, 558, y + 10, 0xFFBBDDC8);
         if (statBars.containsKey(index)) {
           int value = statBars.get(index);
           c.fill(340, y + 1, 524, y + 8, 0xFFB6D5C2);
-          c.fill(340, y + 1, 340 + Math.clamp(value * 184 / 255, 0, 184), y + 8, 0xFF398971);
+          c.fill(
+              340,
+              y + 1,
+              340 + Math.clamp(value * 184 / 255, 0, 184),
+              y + 8,
+              WikiDetails.statColor(value));
           label(c, Integer.toString(value), 537, y, INK);
         }
         int textColor = INK;
@@ -516,18 +560,25 @@ public final class WikiScreen extends InstrumentScreen {
         }
         label(c, lines.get(index), indents.getOrDefault(index, 195), y, textColor);
       }
-      scrollbar(c, 560, 229, 114, detailOffset, lines.size(), DETAIL_ROWS);
-      if (lines.size() > DETAIL_ROWS)
+      scrollbar(
+          c,
+          560,
+          detailY() - 1,
+          visibleDetailRows() * 12 - 2,
+          detailOffset,
+          lines.size(),
+          visibleDetailRows());
+      if (lines.size() > visibleDetailRows())
         label(
             c,
             data.ui("scroll.detail")
                 + (detailOffset + 1)
                 + "–"
-                + Math.min(detailOffset + DETAIL_ROWS, lines.size())
+                + Math.min(detailOffset + visibleDetailRows(), lines.size())
                 + " / "
                 + lines.size(),
             220,
-            355,
+            345,
             MUTED);
     }
     end(c);
@@ -537,12 +588,12 @@ public final class WikiScreen extends InstrumentScreen {
       c.disableScissor();
     }
     for (var preview : evolutionPreviews) {
-      if (preview.row() + 4 <= detailOffset || preview.row() >= detailOffset + DETAIL_ROWS)
+      if (preview.row() + 4 <= detailOffset || preview.row() >= detailOffset + visibleDetailRows())
         continue;
       var model = preview.model();
-      model.setX(left + (int) (196 * scale));
+      model.setX(left + (int) ((196 + CONTENT_OFFSET_X) * scale));
       model.setY(top + (int) ((228 + (preview.row() - detailOffset) * 12) * scale));
-      clip(c, 192, 224, 49, 125);
+      clip(c, 192, 224, 49, 117);
       model.render(c, mouseX, mouseY, delta);
       c.disableScissor();
     }
@@ -569,11 +620,20 @@ public final class WikiScreen extends InstrumentScreen {
   public boolean mouseClicked(double x, double y, int button) {
     int mx = localX(x), my = localY(y);
     if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return super.mouseClicked(x, y, button);
-    if (hit(mx, my, 544, 20, 20, 21)) {
+    if (hit(mx, my, 544, 25, 20, 21)) {
       close();
       return true;
     }
+    moveSearch.setFocused(hasMoveSearch() && hit(mx, my, 192, 227, 352, 19));
     search.setFocused(hit(mx, my, 30, 63, 140, 21));
+    if (hasMoveSearch() && hit(mx, my, 544, 227, 14, 19)) {
+      moveSearch.setText("");
+      return true;
+    }
+    if (moveSearch.isFocused()) {
+      moveSearch.mouseClicked(mx, my, button);
+      return true;
+    }
     if (search.isFocused()) {
       search.mouseClicked(mx, my, button);
       return true;
@@ -600,6 +660,7 @@ public final class WikiScreen extends InstrumentScreen {
     if (selected != null) {
       if (hit(mx, my, DETAIL_X, TAB_Y, 378, 21) && (mx - DETAIL_X) % 63 < 61) {
         tab = Math.min(5, (mx - DETAIL_X) / 63);
+        moveSearch.setFocused(false);
         rebuild();
         return true;
       }
@@ -611,10 +672,11 @@ public final class WikiScreen extends InstrumentScreen {
   public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
     if (vertical == 0) return false;
     int mx = localX(x), my = localY(y), change = vertical > 0 ? -3 : 3;
-    if (hit(mx, my, 27, 54, 147, 295))
+    if (hit(mx, my, 27, 54, 147, 287))
       listOffset = Math.clamp(listOffset + change, 0, Math.max(0, filtered.size() - LIST_ROWS));
-    else if (hit(mx, my, 187, 224, 378, 125))
-      detailOffset = Math.clamp(detailOffset + change, 0, Math.max(0, lines.size() - DETAIL_ROWS));
+    else if (hit(mx, my, 187, detailY() - 2, 378, visibleDetailRows() * 12))
+      detailOffset =
+          Math.clamp(detailOffset + change, 0, Math.max(0, lines.size() - visibleDetailRows()));
     else return false;
     return true;
   }
@@ -622,6 +684,7 @@ public final class WikiScreen extends InstrumentScreen {
   @Override
   public boolean keyPressed(int key, int scan, int mods) {
     if (key == GLFW.GLFW_KEY_ESCAPE) return super.keyPressed(key, scan, mods);
+    if (moveSearch.isFocused()) return moveSearch.keyPressed(key, scan, mods);
     if (search.isFocused() && search.keyPressed(key, scan, mods)) return true;
     if (key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_UP) {
       int i =
@@ -640,6 +703,7 @@ public final class WikiScreen extends InstrumentScreen {
 
   @Override
   public boolean charTyped(char ch, int mods) {
-    return search.charTyped(ch, mods) || super.charTyped(ch, mods);
+    return (moveSearch.isFocused() ? moveSearch.charTyped(ch, mods) : search.charTyped(ch, mods))
+        || super.charTyped(ch, mods);
   }
 }

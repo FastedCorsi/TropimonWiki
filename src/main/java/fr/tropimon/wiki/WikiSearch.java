@@ -11,6 +11,11 @@ final class WikiSearch {
         .replaceAll("[^a-z0-9]", "");
   }
 
+  static boolean matchesMove(String query, String name, String id, String type) {
+    String q = normalize(query);
+    return normalize(name).contains(q) || normalize(id).contains(q) || normalize(type).contains(q);
+  }
+
   static boolean matches(String query, String name, String id, int number) {
     String q = normalize(query);
     return normalize(name).contains(q)

@@ -128,5 +128,7 @@
   "tropimon_wiki.evolution.unavailable": "Évolutions indisponibles pour cette forme.",
   "tropimon_wiki.evolution.none": "Ce Pokémon ne possède pas d’évolution pour cette forme.",
   "tropimon_wiki.move.stats": "%s   Puiss. %s   Préc. %s   PP %s",
-  "tropimon_wiki.close": "Échap · Fermer"
+  "tropimon_wiki.close": "Échap · Fermer",
+  "tropimon_wiki.moves.search": "Rechercher une attaque ou un type…",
+  "tropimon_wiki.moves.empty": "Aucune attaque ne correspond."
 }

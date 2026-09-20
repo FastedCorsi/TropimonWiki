@@ -15,6 +15,7 @@ abstract class InstrumentScreen extends Screen {
       WHITE = 0xFFF2FFF4;
   private static final Identifier FRAME =
       Identifier.of("cobblemon", "textures/gui/pokedex/pokedex_base_green.png");
+  static final int CONTENT_OFFSET_X = 4;
   protected int left, top;
   protected float scale;
 
@@ -24,14 +25,14 @@ abstract class InstrumentScreen extends Screen {
 
   @Override
   protected void init() {
-    // Keep visible space around the Wiki, including at large Minecraft GUI scales.
-    scale = Math.min(1F, Math.min(width * 0.80F / W, height * 0.78F / H));
+    // Small fixed margins preserve readable text at large Minecraft GUI scales.
+    scale = Math.min(1F, Math.min((width - 16F) / W, (height - 16F) / H));
     left = (int) ((width - W * scale) / 2);
     top = (int) ((height - H * scale) / 2);
   }
 
   protected int localX(double x) {
-    return (int) Math.floor((x - left) / scale);
+    return (int) Math.floor((x - left) / scale) - CONTENT_OFFSET_X;
   }
 
   protected int localY(double y) {
@@ -43,19 +44,21 @@ abstract class InstrumentScreen extends Screen {
     c.getMatrices().push();
     c.getMatrices().translate(left, top, 0);
     c.getMatrices().scale(scale, scale, 1);
-    c.fill(6, 6, W + 4, H + 4, 0x6609181B);
-    c.fill(18, 15, W - 18, H - 15, 0xFF386A5D);
-    c.drawTexture(FRAME, 0, 0, W, H, 0, 0, 345, 207, 345, 207);
-    c.fill(27, 15, W - 35, 47, INK);
-    c.fill(29, 19, 31, 41, accent);
-    label(c, label, 40, 20, WHITE);
-    label(c, subtitle, 40, 34, MUTED);
-    c.fill(27, H - 29, W - 35, H - 14, INK);
-    label(c, "By FastedCorsi", 34, H - 25, MUTED);
-    label(c, Text.translatable("tropimon_wiki.close").getString(), W - 116, H - 25, MUTED);
+    // Backing stays inside the native aperture; the frame is painted above its contents.
+    c.fill(31, 25, W - 31, 357, 0xFF386A5D);
+    c.getMatrices().translate(CONTENT_OFFSET_X, 0, 0);
+    c.fill(27, 25, W - 35, 50, INK);
+    c.fill(29, 28, 31, 47, accent);
+    label(c, label, 40, 28, WHITE);
+    label(c, subtitle, 40, 40, MUTED);
+    c.fill(27, 343, W - 35, 357, INK);
+    label(c, "By FastedCorsi", 34, 345, MUTED);
+    label(c, Text.translatable("tropimon_wiki.close").getString(), W - 116, 345, MUTED);
   }
 
   protected void end(DrawContext c) {
+    c.getMatrices().translate(-CONTENT_OFFSET_X, 0, 0);
+    c.drawTexture(FRAME, 0, 0, W, H, 0, 0, 345, 207, 345, 207);
     c.getMatrices().pop();
   }
 

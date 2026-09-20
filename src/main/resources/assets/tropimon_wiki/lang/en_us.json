@@ -128,5 +128,7 @@
   "tropimon_wiki.evolution.unavailable": "Evolution data unavailable for this form.",
   "tropimon_wiki.evolution.none": "This Pokémon has no evolution for this form.",
   "tropimon_wiki.move.stats": "%s   Power %s   Acc. %s   PP %s",
-  "tropimon_wiki.close": "Esc · Close"
+  "tropimon_wiki.close": "Esc · Close",
+  "tropimon_wiki.moves.search": "Search moves or types…",
+  "tropimon_wiki.moves.empty": "No matching moves."
 }

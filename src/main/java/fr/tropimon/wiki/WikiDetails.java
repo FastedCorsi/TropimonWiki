@@ -22,6 +22,14 @@ final class WikiDetails {
     return unique.values().stream().sorted(Comparator.comparing(Ability::hidden)).toList();
   }
 
+  // Same red/yellow/green progression as Tropimon's stat display, on base stats (40..140).
+  static int statColor(int value) {
+    double t = Math.clamp((value - 40) / 100.0, 0.0, 1.0);
+    int red = t <= 0.5 ? 255 : (int) Math.round(255 - (t - 0.5) * 340);
+    int green = t >= 0.5 ? 255 : (int) Math.round(85 + t * 340);
+    return 0xFF000055 | (red << 16) | (green << 8);
+  }
+
   static int generation(int number) {
     int[] last = {151, 251, 386, 493, 649, 721, 809, 905, 1025};
     if (number <= 0) return 0;
