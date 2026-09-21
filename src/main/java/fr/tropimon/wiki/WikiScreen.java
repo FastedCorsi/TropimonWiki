@@ -44,6 +44,9 @@ public final class WikiScreen extends InstrumentScreen {
   private final Map<Integer, ItemStack> itemRows = new HashMap<>();
   private StructurePreview.Model habitatPreview;
   private String previewPool = "";
+  private String phasePool = "";
+  private int habitatPhase;
+  private List<Integer> habitatPhases = List.of();
 
   private List<WikiDetails.Ability> abilities = List.of();
   private final List<TypeIcon> typeIcons = new ArrayList<>();
@@ -127,6 +130,7 @@ public final class WikiScreen extends InstrumentScreen {
     selected = species;
     formIndex = 0;
     spawnIndex = 0;
+    phasePool = "";
     forms.clear();
     if (species != null) {
       forms.add(species.getStandardForm());
@@ -386,9 +390,32 @@ public final class WikiScreen extends InstrumentScreen {
     }
     spawnIndex = Math.floorMod(spawnIndex, spawnEntries.size());
     var entry = spawnEntries.get(spawnIndex);
+    if (habitatMode && !phasePool.equals(entry.pool())) {
+      phasePool = entry.pool();
+      habitatPhases =
+          spawnCatalog.entries().stream()
+              .filter(e -> e.pool().equals(phasePool))
+              .flatMap(e -> e.phases().stream())
+              .distinct()
+              .sorted()
+              .toList();
+      habitatPhase = entry.phases().isEmpty() ? 0 : entry.phases().getFirst();
+    }
     paragraphX = habitatMode ? 312 : 195;
     heading(habitatMode ? data.habitatTitle(entry.title()) : data.ui("spawn.wild"));
-    for (String line : WikiSpawns.describe(entry, data)) paragraph(line);
+    if (habitatMode && habitatPhase > 0) {
+      paragraph(data.ui("spawn.phase_title", habitatPhase));
+      var residents = WikiSpawns.residents(spawnCatalog, entry.pool(), habitatPhase, data);
+      if (residents.isEmpty()) paragraph(data.ui("spawn.phase_empty"));
+      for (var resident : residents) {
+        heading(resident.name());
+        paragraph(data.evSummary(resident.yield()));
+      }
+      paragraph(data.ui("spawn.phase_possible"));
+    } else {
+      for (String line : WikiSpawns.describe(entry, data)) paragraph(line);
+      if (habitatMode) paragraph(data.ui("evs") + data.evSummary(data.evYield(selected, form)));
+    }
     paragraph("");
     paragraph(data.ui("spawn.source"));
     if (spawnCatalog.skipped() > 0) paragraph(data.ui("spawn.incomplete"));
@@ -459,11 +486,22 @@ public final class WikiScreen extends InstrumentScreen {
     if (habitatMode && !spawnEntries.isEmpty()) {
       c.fill(192, 251, 306, 338, PANEL);
       if (habitatPreview != null) {
-        clip(c, 192, 251, 114, 87);
-        StructurePreview.render(c, habitatPreview, 194, 253, 110, 83, 135F, 1.6F);
+        clip(c, 192, 251, 114, 62);
+        StructurePreview.render(c, habitatPreview, 194, 253, 110, 58, 135F, 1.6F);
         c.disableScissor();
       } else
         text(c, data.ui(previewLoading ? "spawn.loading" : "spawn.no_image"), 198, 266, 102, WHITE);
+      chip(c, "‹", 192, 317, 21, false, hit(mx, my, 192, 317, 21, 21), ACCENT);
+      chip(
+          c,
+          data.ui(habitatPhase == 0 ? "spawn.phase_info" : "spawn.phase", habitatPhase),
+          215,
+          317,
+          68,
+          habitatPhase > 0,
+          hit(mx, my, 215, 317, 68, 21),
+          ACCENT);
+      chip(c, "›", 285, 317, 21, false, hit(mx, my, 285, 317, 21, 21), ACCENT);
     }
   }
 
@@ -526,7 +564,12 @@ public final class WikiScreen extends InstrumentScreen {
       var primary = form.getPrimaryType();
       heading(data.ui("baron.type_bonus", data.text(primary.getDisplayName())));
       paragraph(data.ui("baron.type_explain"));
-      lootTable("types/" + primary.getName().toLowerCase(Locale.ROOT) + "_rewards_tier" + (baronLevel >= 51 ? 2 : 1), true);
+      lootTable(
+          "types/"
+              + primary.getName().toLowerCase(Locale.ROOT)
+              + "_rewards_tier"
+              + (baronLevel >= 51 ? 2 : 1),
+          true);
       paragraph(data.ui("baron.ordinary"));
     } else {
       heading(data.ui("baron.tm_short"));
@@ -958,7 +1001,9 @@ public final class WikiScreen extends InstrumentScreen {
       tooltip.add(Text.literal(data.ui("baron.level_hint")));
     if (tab == 1 && hit(mx, my, 192, 320, 366, 21))
       tooltip.add(Text.literal(data.ui("evs.source")));
-    if (tab == 6 && hit(mx, my, 192, 251, 114, 87) && !spawnEntries.isEmpty())
+    if (tab == 6 && habitatMode && hit(mx, my, 192, 317, 114, 21))
+      tooltip.add(Text.literal(data.ui("spawn.phase_hint")));
+    if (tab == 6 && hit(mx, my, 192, 251, 114, 62) && !spawnEntries.isEmpty())
       tooltip.add(Text.literal(data.ui("spawn.preview")));
 
     for (int i = 0; i < Math.min(3, abilities.size()); i++) {
@@ -1021,6 +1066,19 @@ public final class WikiScreen extends InstrumentScreen {
       return true;
     }
     if (selected != null) {
+      if (tab == 6 && habitatMode && !spawnEntries.isEmpty() && hit(mx, my, 192, 317, 114, 21)) {
+        List<Integer> phases = new ArrayList<>();
+        phases.add(0);
+        phases.addAll(habitatPhases);
+        if (mx >= 215 && mx < 283)
+          habitatPhase = habitatPhase == 0 && phases.size() > 1 ? phases.get(1) : 0;
+        else if (mx < 213 || mx >= 285)
+          habitatPhase =
+              phases.get(
+                  Math.floorMod(phases.indexOf(habitatPhase) + (mx < 213 ? -1 : 1), phases.size()));
+        rebuild();
+        return true;
+      }
       if (hit(mx, my, 449, 55, 74, 21)) {
         tab = 6;
         spawnIndex = 0;

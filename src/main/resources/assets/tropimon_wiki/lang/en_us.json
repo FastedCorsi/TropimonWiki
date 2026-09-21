@@ -292,5 +292,11 @@
   "tropimon_wiki.baron.unknown_chance": "unspecified",
   "tropimon_wiki.baron.tm_short": "Unlock on capture · TM Machine",
   "tropimon_wiki.baron.blank_tm": "Blank TM",
-  "tropimon_wiki.baron.empty_roll": "%s / roll"
+  "tropimon_wiki.baron.empty_roll": "%s / roll",
+  "tropimon_wiki.spawn.phase_title": "Phase %s · EV yield",
+  "tropimon_wiki.spawn.phase_empty": "No Pokémon listed for this phase.",
+  "tropimon_wiki.spawn.phase_possible": "Possible spawns depend on habitat conditions. Base EVs earned by defeating the Pokémon, before bonuses.",
+  "tropimon_wiki.spawn.phase_info": "Info",
+  "tropimon_wiki.spawn.phase": "Phase %s",
+  "tropimon_wiki.spawn.phase_hint": "Arrows: browse phases and Pokémon with their EV yield. Center button: switch between conditions and the list. Unknown EVs are not treated as zero."
 }

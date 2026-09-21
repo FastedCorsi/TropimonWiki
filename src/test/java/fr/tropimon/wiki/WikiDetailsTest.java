@@ -7,6 +7,20 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class WikiDetailsTest {
+  @Test
+  void habitatPhasesPreserveRangesGapsAndOrder() {
+    assertEquals(List.of(1, 2, 3, 5, 7, 8, 9), WikiDetails.phases("1-3, 5, 7-9"));
+    assertEquals(List.of(2, 3, 4), WikiDetails.phases("4, 2 - 3, 3, 4-4"));
+    assertEquals(36, WikiDetails.phases("1-36").size());
+  }
+
+  @Test
+  void invalidHabitatPhasesNeverBecomeAllPhasesOrPartialRanges() {
+    for (String value : List.of("", "0", "3-1", "1, unknown", "1-999999999", "1,", "-2", "1-2-3"))
+      assertTrue(WikiDetails.phases(value).isEmpty(), value);
+    assertTrue(WikiDetails.phases(null).isEmpty());
+  }
+
   private WikiDetails.Ability ability(String id, boolean hidden) {
     return new WikiDetails.Ability(id, id, "Description", hidden);
   }

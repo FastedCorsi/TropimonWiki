@@ -1,6 +1,6 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.8
+By FastedCorsi — 0.1.9
 
 **F7** : Tropimon Wiki (touche reconfigurable).
 
@@ -27,7 +27,7 @@ Le build local identifie l'unique JAR Cobblemon par fabric.mod.json, même si so
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.8/local` et `build/release/0.1.8/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.9/local` et `build/release/0.1.9/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
 
 L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Le nouvel updater prend aussi en charge les deux copies et le suivi du stockage géré, sans dépendance à un autre mod. Les anciennes versions déjà distribuées ne sont pas réparées rétroactivement. Vérification asynchrone au démarrage uniquement après consentement explicite, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 
@@ -70,3 +70,5 @@ Pour Cobblemon 1.8.0 et 1.8.1, le script de récompenses utilise le premier type
 Les recettes de CT utilisent le registre synchronisé lorsqu’il est disponible, sinon les définitions locales. Le Wiki distingue les attaques accessibles au niveau choisi (y compris les pré-évolutions) des deux attaques CT bonus. Les bonus suivent deux tirages pondérés sans remplacement parmi les CT qui ne sont pas déjà des attaques apprises par niveau ; les probabilités sont calculées avec les poids de Cobblemon. Elles concernent le déblocage de la recette à la capture, pas la chance de capturer le Pokémon. Le Wiki montre les quantités, les ingrédients possibles et la CT vierge consommée dans la Machine à CT, avec les icônes d’objets et de types. Un filtre permet de chercher une CT par nom ou type. Aucun objet ni déblocage n’est ajouté au joueur.
 
 Les tests couvrent les frontières des quatre paliers, les entrées vides, les tirages multiples, les petits ensembles de CT, les 40 tables locales, et comparent les chances calculées au sélecteur natif de Cobblemon. L’interface des Barons est incluse dans les essais des quatre échelles GUI.
+
+Dans la fiche Habitats, les flèches sous l’aperçu parcourent les phases. Chaque phase liste les Pokémon et leurs EV de base gagnés après un K.O., avec la forme correspondante. Les plages de phases et leurs exclusions sont conservées ; les doublons d’une même forme sont regroupés. Le bouton central permet de retrouver les conditions détaillées. Une donnée EV absente reste inconnue, sans être remplacée par zéro. Les apparitions restent des possibilités soumises aux conditions locales et aux règles du serveur.

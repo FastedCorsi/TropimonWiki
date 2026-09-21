@@ -16,6 +16,10 @@ final class WikiSpawns {
       return !pool.isEmpty();
     }
 
+    List<Integer> phases() {
+      return WikiDetails.phases(WikiDetails.value(spawn, "phases", ""));
+    }
+
     boolean matches(Species species, FormData form) {
       String name = pokemon.split(" ", 2)[0].replace("cobblemon:", "");
       if (!name.equalsIgnoreCase(species.getResourceIdentifier().getPath())) return false;
@@ -30,6 +34,42 @@ final class WikiSpawns {
   }
 
   record Catalog(List<Entry> entries, StructurePreview.Index structures, int skipped) {}
+
+  record Resident(String name, WikiData.Yield yield) {}
+
+  static List<Resident> residents(Catalog catalog, String pool, int phase, WikiData data) {
+    Map<String, Resident> residents = new LinkedHashMap<>();
+    for (var entry : catalog.entries()) {
+      if (!entry.habitat() || !entry.pool().equals(pool) || !entry.phases().contains(phase))
+        continue;
+      try {
+        String id = entry.pokemon().split("\\s+", 2)[0];
+        var expectedSpecies =
+            id.contains(":")
+                ? com.cobblemon.mod.common.api.pokemon.PokemonSpecies.getByIdentifier(
+                    net.minecraft.util.Identifier.of(id))
+                : com.cobblemon.mod.common.api.pokemon.PokemonSpecies.getByName(id);
+        if (expectedSpecies == null) throw new IllegalArgumentException();
+        var pokemon = PokemonProperties.Companion.parse(entry.pokemon()).asRenderablePokemon();
+        // The renderable API may substitute a default Pokémon for an unknown species.
+        if (pokemon == null || pokemon.getSpecies() != expectedSpecies)
+          throw new IllegalArgumentException();
+        var species = pokemon.getSpecies();
+        var form = pokemon.getForm();
+        String key = species.getResourceIdentifier() + "/" + form.getName();
+        if (!residents.containsKey(key)) {
+          String name = data.species(species);
+          if (form != species.getStandardForm()) name += " · " + data.name("form", form.getName());
+          residents.put(key, new Resident(name, data.evYield(species, form)));
+        }
+      } catch (RuntimeException unknownSpecies) {
+        residents.putIfAbsent(
+            entry.pokemon(),
+            new Resident(entry.pokemon(), new WikiData.Yield(Map.of(), false, true)));
+      }
+    }
+    return List.copyOf(residents.values());
+  }
 
   static Catalog load() throws IOException {
     Map<String, JsonObject> files = new TreeMap<>();

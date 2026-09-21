@@ -8,6 +8,24 @@ import java.util.function.BiFunction;
 final class WikiDetails {
   record Ability(String id, String name, String description, boolean hidden) {}
 
+  static List<Integer> phases(String expression) {
+    if (expression == null || expression.isBlank()) return List.of();
+    Set<Integer> phases = new TreeSet<>();
+    try {
+      for (String part : expression.split(",", -1)) {
+        String[] bounds = part.strip().split("\\s*-\\s*", -1);
+        if (bounds.length > 2) return List.of();
+        int first = Integer.parseInt(bounds[0]);
+        int last = bounds.length == 1 ? first : Integer.parseInt(bounds[1]);
+        if (first < 1 || last < first || last > 4096) return List.of();
+        for (int phase = first; phase <= last; phase++) phases.add(phase);
+      }
+      return List.copyOf(phases);
+    } catch (NumberFormatException invalid) {
+      return List.of();
+    }
+  }
+
   static List<Ability> abilities(List<Ability> entries) {
     Map<String, Ability> unique = new LinkedHashMap<>();
     for (var entry : entries) {

@@ -177,6 +177,18 @@ final class WikiData {
 
   record Yield(Map<String, Integer> values, boolean available, boolean local) {}
 
+  String evSummary(Yield yield) {
+    if (!yield.available()) return ui("evs.unknown");
+    String values =
+        String.join(
+            " · ",
+            List.of("hp", "atk", "def", "spa", "spd", "spe").stream()
+                .filter(id -> yield.values().getOrDefault(id, 0) > 0)
+                .map(id -> "+" + yield.values().get(id) + " " + name("stat", id))
+                .toList());
+    return values.isEmpty() ? ui("none") : values;
+  }
+
   Yield evYield(Species species, FormData form) {
     Map<String, Integer> live = new LinkedHashMap<>();
     form.getEvYield().forEach((stat, value) -> live.put(stat.getShowdownId(), value));

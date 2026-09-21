@@ -408,7 +408,27 @@ public final class SmokeClient implements ClientModInitializer {
                 require(
                     field(screen, "habitatPreview") != null,
                     "habitat has actual structure preview");
+                var catalog = (WikiSpawns.Catalog) field(screen, "spawnCatalog");
+                auditHabitatEvs(catalog);
+                require(
+                    (int) field(screen, "habitatPhase") == 1,
+                    "selected Charmeleon habitat opens matching phase");
+                require(
+                    ((List<String>) field(screen, "lines"))
+                        .stream()
+                            .anyMatch(
+                                line ->
+                                    line.contains("+1")
+                                        && line.contains(new WikiData().name("stat", "spa"))
+                                        && line.contains(new WikiData().name("stat", "spe"))),
+                    "habitat roster displays both Charmeleon EVs");
                 shot(client, "wiki-habitat");
+                click(250, 327);
+                require(
+                    (int) field(screen, "habitatPhase") == 0,
+                    "habitat conditions remain accessible");
+                click(295, 327);
+                require((int) field(screen, "habitatPhase") > 0, "habitat phase navigation");
                 click(320, 236);
                 require(!(boolean) field(screen, "habitatMode"), "switch to wild spawns");
                 entries = (List<WikiSpawns.Entry>) field(screen, "spawnEntries");
@@ -548,6 +568,28 @@ public final class SmokeClient implements ClientModInitializer {
                 click(550, 257);
                 scroll(400, 300, -1);
                 require((int) field(screen, "detailOffset") > 0, "Alpha scroll GUI " + testedScale);
+                click(480, 64);
+                click(220, 236);
+                click(250, 327);
+                if ((int) field(screen, "habitatPhase") == 0) click(295, 327);
+                require(
+                    (int) field(screen, "habitatPhase") > 0,
+                    "habitat phase hitboxes GUI " + testedScale);
+                int phase = (int) field(screen, "habitatPhase");
+                screen.resize(client, screen.width, screen.height);
+                require(
+                    (int) field(screen, "habitatPhase") == phase,
+                    "habitat phase survives resize GUI " + testedScale);
+                stage = 18;
+                ticks = 0;
+              }
+              case 18 -> {
+                if ((boolean) field(screen, "previewLoading")) return;
+                shot(client, "wiki-gui-habitat-ev-" + testedScale);
+                scroll(450, 290, -1);
+                require(
+                    (int) field(screen, "detailOffset") > 0,
+                    "habitat EV list scrolls GUI " + testedScale);
                 if (++testedScale <= 4) {
                   stage = 10;
                   ticks = 0;
@@ -565,6 +607,85 @@ public final class SmokeClient implements ClientModInitializer {
             stage = 99;
           }
         });
+  }
+
+  void auditHabitatEvs(WikiSpawns.Catalog catalog) {
+    var data = new WikiData();
+    var berry =
+        catalog.entries().stream()
+            .filter(e -> e.pool().endsWith(":berry_patch"))
+            .findFirst()
+            .orElseThrow();
+    var one = WikiSpawns.residents(catalog, berry.pool(), 1, data);
+    var two = WikiSpawns.residents(catalog, berry.pool(), 2, data);
+    String zigzagoon = data.name("species", "zigzagoon");
+    require(
+        one.stream().noneMatch(r -> r.name().equals(zigzagoon))
+            && two.stream().anyMatch(r -> r.name().equals(zigzagoon)),
+        "phase roster does not mix adjacent phases");
+    require(
+        one.stream()
+            .allMatch(
+                r ->
+                    r.yield().available()
+                        && r.yield().values().values().stream().mapToInt(Integer::intValue).sum()
+                            > 0),
+        "habitat EVs resolved from loaded species or local fallback");
+    var lickitung =
+        one.stream()
+            .filter(r -> r.name().equals(data.name("species", "lickitung")))
+            .findFirst()
+            .orElseThrow();
+    require(lickitung.yield().values().getOrDefault("hp", 0) == 2, "Lickitung yields 2 HP EVs");
+    var synthetic = new ArrayList<WikiSpawns.Entry>();
+    var phase = new com.google.gson.JsonObject();
+    phase.addProperty("phases", "1");
+    for (String pokemon : List.of("diglett", "diglett", "diglett alolan", "missing_species"))
+      synthetic.add(new WikiSpawns.Entry("example:pool", "test", pokemon, phase, List.of()));
+    var sample =
+        WikiSpawns.residents(
+            new WikiSpawns.Catalog(synthetic, catalog.structures(), 0), "example:pool", 1, data);
+    require(sample.size() == 3, "habitat duplicates merge but regional forms remain distinct");
+    require(
+        sample.stream().filter(r -> r.yield().available()).count() == 2,
+        "unknown habitat species keeps unknown EVs");
+    require(
+        !data.evSummary(new WikiData.Yield(Map.of(), false, true))
+            .equals(data.evSummary(new WikiData.Yield(Map.of(), true, true))),
+        "unknown EV display differs from explicit zero");
+    var allHabitatEntries =
+        catalog.entries().stream()
+            .filter(WikiSpawns.Entry::habitat)
+            .map(
+                e ->
+                    new WikiSpawns.Entry(
+                        "example:all",
+                        "test",
+                        e.pokemon(),
+                        phase,
+                        List.<com.google.gson.JsonObject>of()))
+            .toList();
+    var allResidents =
+        WikiSpawns.residents(
+            new WikiSpawns.Catalog(allHabitatEntries, catalog.structures(), 0),
+            "example:all",
+            1,
+            data);
+    for (var resident : allResidents)
+      require(
+          resident.yield().available()
+              && resident.yield().values().values().stream().mapToInt(Integer::intValue).sum() > 0,
+          "actual habitat resident EVs: " + resident.name());
+    System.out.println("HABITAT_RESIDENTS_WITH_EVS=" + allResidents.size());
+    int checked = 0;
+    for (var entry : catalog.entries())
+      if (entry.habitat()) {
+        if (entry.spawn().has("phases"))
+          require(!entry.phases().isEmpty(), "installed habitat phase expression understood");
+        else require(entry.phases().isEmpty(), "habitat without phase keeps conditions view");
+        checked++;
+      }
+    System.out.println("HABITAT_PHASE_ENTRIES=" + checked);
   }
 
   void auditBarons(WikiBarons.Catalog catalog) throws Exception {

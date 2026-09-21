@@ -292,5 +292,11 @@
   "tropimon_wiki.baron.unknown_chance": "non renseignée",
   "tropimon_wiki.baron.tm_short": "À débloquer à la capture · Machine à CT",
   "tropimon_wiki.baron.blank_tm": "CT vierge",
-  "tropimon_wiki.baron.empty_roll": "%s / tirage"
+  "tropimon_wiki.baron.empty_roll": "%s / tirage",
+  "tropimon_wiki.spawn.phase_title": "Phase %s · EV gagnés",
+  "tropimon_wiki.spawn.phase_empty": "Aucun Pokémon renseigné pour cette phase.",
+  "tropimon_wiki.spawn.phase_possible": "Apparitions possibles selon les conditions de l’habitat. EV de base gagnés en battant le Pokémon, hors bonus.",
+  "tropimon_wiki.spawn.phase_info": "Infos",
+  "tropimon_wiki.spawn.phase": "Phase %s",
+  "tropimon_wiki.spawn.phase_hint": "Flèches : parcourir les phases et voir les Pokémon avec leurs EV. Bouton central : revenir aux conditions / à la liste. Les EV inconnus ne sont pas considérés comme nuls."
 }
