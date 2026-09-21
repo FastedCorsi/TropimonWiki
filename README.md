@@ -1,6 +1,6 @@
 # Tropimon Wiki
 
-By FastedCorsi — 0.1.7
+By FastedCorsi — 0.1.8
 
 **F7** : Tropimon Wiki (touche reconfigurable).
 
@@ -27,7 +27,7 @@ Le build local identifie l'unique JAR Cobblemon par fabric.mod.json, même si so
 
 ## Distribution
 
-Deux exemplaires identiques sont produits dans `build/release/0.1.7/local` et `build/release/0.1.7/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
+Deux exemplaires identiques sont produits dans `build/release/0.1.8/local` et `build/release/0.1.8/shareable`, avec SHA-256. Ne jamais charger les deux exemplaires. L’entrée locale utilise sa copie autonome d’InstallManagedLocalMod.ps1 : elle vérifie le profil actif et son format, attend l’arrêt du jeu puis synchronise mods-user, mods et user-mods-tracked.json pour le seul Wiki. Elle préserve les autres mods et leurs désactivations, vérifie les empreintes, archive les anciennes copies hors des mods et refuse une cible modifiée, verrouillée, redirigée, ambiguë ou plus récente. Le launcher peut rester ouvert.
 
 L'auto-update est autonome : uniquement la Release du dépôt de ce mod, SHA-256, identifiant et version exacts, préparation hors des mods, remplacement différé après arrêt du jeu sous Windows. Le nouvel updater prend aussi en charge les deux copies et le suivi du stockage géré, sans dépendance à un autre mod. Les anciennes versions déjà distribuées ne sont pas réparées rétroactivement. Vérification asynchrone au démarrage uniquement après consentement explicite, espacée d'au moins six heures entre les sessions. Désactivation locale possible dans le fichier `config/<mod_id>-updater.json`.
 
@@ -53,10 +53,20 @@ Les marges intérieures sont centrées dans l’ouverture du cadre natif, sans f
 
 ## Habitats, apparitions et EV
 
-Le bouton « Habitats · Apparitions » présente les habitats et les apparitions naturelles de la forme choisie. Les niveaux, raretés, phases, biomes, horaires, météo, prérequis, exclusions, groupes et multiplicateurs proviennent des définitions des mods installés ; un poids relatif ne représente pas une probabilité en pourcentage. Les données personnalisées d’un serveur distant ne sont pas synchronisées par cette interface. Une absence locale signifie « aucune apparition renseignée », jamais « impossible sur le serveur ».
+Le bouton « Habitats » présente les habitats et les apparitions naturelles de la forme choisie. Les niveaux, raretés, phases, biomes, horaires, météo, prérequis, exclusions, groupes et multiplicateurs proviennent des définitions des mods installés ; un poids relatif ne représente pas une probabilité en pourcentage. Les données personnalisées d’un serveur distant ne sont pas synchronisées par cette interface. Une absence locale signifie « aucune apparition renseignée », jamais « impossible sur le serveur ».
 
 L’aperçu représente une variante de la véritable structure NBT locale, associée au bloc d’habitat portant son identifiant de pool. Aucun téléchargement ni image de structure redistribuée : les blocs sont dessinés avec les ressources du jeu. Les variantes, processeurs et raccords peuvent différer dans le monde. Le catalogue est lu une fois à la demande dans une tâche asynchrone ; seul le modèle de l’habitat sélectionné est conservé. Le Wiki reste indépendant de Tropimon Farm.
 
 Le paquet d’espèce Cobblemon omet les EV gagnés. Le Wiki utilise les définitions du Cobblemon chargé si le client n’a pas cette information, avec héritage des formes et distinction entre zéro explicite et donnée inconnue. La provenance est expliquée au survol de la ligne EV. Le contrôle isolé parcourt toutes les espèces et formes locales et teste aussi un véritable aller-retour du paquet réseau.
 
 Le bas du panneau rejoint l’ouverture du cadre ; le champ d’attaques utilise un fond sombre pour conserver le contraste avec le texte et son ombre native. Les essais isolés passent les échelles GUI demandées 1 à 4, consignent leur échelle effective et vérifient saisie, clics, défilement, redimensionnement et fermeture. Le mod ne change pas le réglage global du joueur.
+
+## Barons / Alphas
+
+Le bouton « Barons » ouvre les apparitions recensées, le butin après une victoire contre un Baron sauvage et les recettes de CT déblocables à sa capture. Le niveau est réglable de 1 à 100 (Maj pour avancer de dix niveaux). Les quantités, paliers et tables de butin sont lus dans le Cobblemon installé. Les poids sont normalisés par groupe, avec les entrées vides ; le Wiki distingue le pourcentage par tirage de la chance d’obtenir l’objet au moins une fois par Baron. Les tirages de quantité et de nombre de récompenses restent distincts. Le butin habituel de l’espèce reste dans « Butin ».
+
+Pour Cobblemon 1.8.0 et 1.8.1, le script de récompenses utilise le premier type pour les deux essais de bonus à 50 %, y compris pour les doubles types. Cette particularité est reproduite et vérifiée en exécutant la branche réelle du script avec le moteur Molang. Une règle inconnue n’est pas présentée comme un zéro ou une certitude. Les tables et scripts des serveurs distants ne sont pas transmis : leur provenance locale est indiquée.
+
+Les recettes de CT utilisent le registre synchronisé lorsqu’il est disponible, sinon les définitions locales. Le Wiki distingue les attaques accessibles au niveau choisi (y compris les pré-évolutions) des deux attaques CT bonus. Les bonus suivent deux tirages pondérés sans remplacement parmi les CT qui ne sont pas déjà des attaques apprises par niveau ; les probabilités sont calculées avec les poids de Cobblemon. Elles concernent le déblocage de la recette à la capture, pas la chance de capturer le Pokémon. Le Wiki montre les quantités, les ingrédients possibles et la CT vierge consommée dans la Machine à CT, avec les icônes d’objets et de types. Un filtre permet de chercher une CT par nom ou type. Aucun objet ni déblocage n’est ajouté au joueur.
+
+Les tests couvrent les frontières des quatre paliers, les entrées vides, les tirages multiples, les petits ensembles de CT, les 40 tables locales, et comparent les chances calculées au sélecteur natif de Cobblemon. L’interface des Barons est incluse dans les essais des quatre échelles GUI.

@@ -38,6 +38,10 @@ public final class WikiScreen extends InstrumentScreen {
   private List<WikiSpawns.Entry> spawnEntries = List.of();
   private boolean spawnLoading, spawnFailed, habitatMode = true, previewLoading;
   private int spawnIndex, previewRevision;
+  private WikiBarons.Catalog baronCatalog;
+  private boolean baronLoading, baronFailed;
+  private int baronPage, baronLevel = 50;
+  private final Map<Integer, ItemStack> itemRows = new HashMap<>();
   private StructurePreview.Model habitatPreview;
   private String previewPool = "";
 
@@ -190,6 +194,8 @@ public final class WikiScreen extends InstrumentScreen {
     moveIcons.clear();
     indents.clear();
     evolutionPreviews.clear();
+    itemRows.clear();
+    if (moveSearch != null) moveSearch.setY(searchY() + 4);
     paragraphX = 195;
     detailOffset = 0;
     if (selected == null || textRenderer == null) return;
@@ -310,6 +316,7 @@ public final class WikiScreen extends InstrumentScreen {
         for (var move : form.getMoves().getEggMoves()) move(data.ui("egg_move"), move);
       }
       case 6 -> buildSpawns();
+      case 7 -> buildBarons();
       case 5 -> {
         heading(data.ui("drops.title"));
         paragraph(data.ui("drops.server"));
@@ -360,7 +367,7 @@ public final class WikiScreen extends InstrumentScreen {
                           spawnLoading = false;
                           spawnFailed = failure != null;
                           spawnCatalog = catalog;
-                          if (client.currentScreen == this && tab == 6) rebuild();
+                          if (client.currentScreen == this && (tab == 6 || tab == 7)) rebuild();
                         }));
       }
       return;
@@ -460,6 +467,193 @@ public final class WikiScreen extends InstrumentScreen {
     }
   }
 
+  private void buildBarons() {
+    if (baronCatalog == null) {
+      paragraph(data.ui(baronFailed ? "baron.unavailable" : "spawn.loading"));
+      if (!baronLoading && !baronFailed) {
+        baronLoading = true;
+        java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> {
+                  try {
+                    return WikiBarons.load();
+                  } catch (java.io.IOException failure) {
+                    throw new java.util.concurrent.CompletionException(failure);
+                  }
+                })
+            .whenComplete(
+                (catalog, failure) ->
+                    client.execute(
+                        () -> {
+                          baronLoading = false;
+                          baronFailed = failure != null;
+                          baronCatalog = catalog;
+                          if (client.currentScreen == this && tab == 7) rebuild();
+                        }));
+      }
+      return;
+    }
+    if (baronPage == 0) {
+      heading(data.ui("baron.title", data.species(selected)));
+      paragraph(data.ui("baron.explain"));
+      paragraph(data.ui("baron.tiers"));
+      paragraph(data.ui("baron.rolls_explain"));
+      paragraph(data.ui("baron.machine"));
+      paragraph(data.ui("baron.tm_explain"));
+      paragraph(data.ui("baron.source"));
+      paragraph("");
+      heading(data.ui("baron.spawns"));
+      if (spawnCatalog == null) {
+        buildSpawns();
+        return;
+      }
+      var entries =
+          spawnCatalog.entries().stream()
+              .filter(e -> WikiBarons.alpha(e.pokemon()) && e.matches(selected, form))
+              .toList();
+      if (entries.isEmpty()) paragraph(data.ui("baron.no_spawn"));
+      for (var entry : entries) {
+        heading(entry.habitat() ? data.habitatTitle(entry.title()) : data.ui("spawn.wild"));
+        for (var line : WikiSpawns.describe(entry, data)) paragraph(line);
+        paragraph("");
+      }
+    } else if (baronPage == 1) {
+      heading(data.ui("baron.ko", WikiBaronRules.tier(baronLevel)));
+      if (!baronCatalog.knownDrops()) {
+        paragraph(data.ui("baron.unknown_rules"));
+        return;
+      }
+      lootTable("alpha_rewards_tier" + WikiBaronRules.tier(baronLevel), false);
+      var primary = form.getPrimaryType();
+      heading(data.ui("baron.type_bonus", data.text(primary.getDisplayName())));
+      paragraph(data.ui("baron.type_explain"));
+      lootTable("types/" + primary.getName().toLowerCase(Locale.ROOT) + "_rewards_tier" + (baronLevel >= 51 ? 2 : 1), true);
+      paragraph(data.ui("baron.ordinary"));
+    } else {
+      heading(data.ui("baron.tm_short"));
+      var machines = WikiBarons.machines(baronCatalog, form, baronLevel);
+      if (machines.isEmpty()) paragraph(data.ui("baron.tm_none"));
+      for (var tm : machines) {
+        var move = tm.move();
+        if (!WikiSearch.matchesMove(
+            moveSearch.getText(),
+            data.text(move.getDisplayName()),
+            move.getName(),
+            data.text(move.getElementalType().getDisplayName()))) continue;
+        if (!moveRows.isEmpty()) paragraph("");
+        int row = lines.size();
+        moveRows.put(row, move);
+        moveIcons.put(
+            row, new TypeIcon(196, 0, move.getElementalType(), null, false, true, 0F, 0F, 1F));
+        paragraphX = 213;
+        heading(data.text(move.getDisplayName()));
+        paragraphX = 195;
+        paragraph(
+            data.ui(
+                tm.chance() == 1 ? "baron.tm_guaranteed" : "baron.tm_chance",
+                percent(tm.chance())));
+        var ingredients = tm.machine().getClampedRecipe(3);
+        if (ingredients == null) {
+          paragraph(data.ui("baron.no_recipe"));
+          continue;
+        }
+        itemLine("cobblemon:blank_tm", 1, "");
+        for (var ingredient : ingredients) {
+          var stacks = ingredient.getIngredient().getMatchingStacks();
+          if (stacks.length == 0) {
+            paragraph(data.ui("baron.ingredient_unknown"));
+            continue;
+          }
+          itemRows.put(lines.size(), stacks[0]);
+          paragraphX = 213;
+          paragraph(
+              ingredient.getCount()
+                  + " × "
+                  + String.join(
+                      data.ui("baron.or"),
+                      Arrays.stream(stacks)
+                          .map(stack -> stack.getName().getString())
+                          .distinct()
+                          .toList()));
+          paragraphX = 195;
+        }
+      }
+    }
+  }
+
+  private void lootTable(String id, boolean bonus) {
+    try {
+      var table = baronCatalog.loot().get(id);
+      if (table == null) throw new IllegalArgumentException();
+      int group = 0;
+      for (var pool : WikiBaronRules.pools(table)) {
+        heading(data.ui("baron.group", ++group, pool.rolls().toString()));
+        for (var drop : pool.drops()) {
+          itemLine(
+              drop.item(),
+              0,
+              drop.item().isEmpty() ? data.ui("baron.empty") : data.name("item", drop.item()));
+          paragraph(
+              data.ui(
+                  drop.item().isEmpty() ? "baron.empty_roll" : "baron.per_roll",
+                  percent(drop.probability()),
+                  drop.count().toString()));
+          if (!drop.item().isEmpty() && drop.count().min() > 0) {
+            double chance = WikiBaronRules.atLeastOnce(drop.probability(), pool.rolls());
+            if (bonus) chance = 1 - Math.pow(1 - .5 * chance, 2);
+            paragraph(data.ui("baron.at_least", percent(chance)));
+          }
+        }
+        paragraph("");
+      }
+    } catch (RuntimeException unknownTable) {
+      paragraph(data.ui("baron.unknown_table"));
+    }
+  }
+
+  private String percent(double chance) {
+    if (!Double.isFinite(chance)) return data.ui("baron.unknown_chance");
+    return String.format(
+        client.getLanguageManager().getLanguage().startsWith("fr") ? Locale.FRANCE : Locale.ROOT,
+        "%.2f %%",
+        chance * 100);
+  }
+
+  private void itemLine(String id, int count, String label) {
+    var identifier = Identifier.tryParse(id);
+    if (identifier != null && net.minecraft.registry.Registries.ITEM.containsId(identifier)) {
+      itemRows.put(
+          lines.size(), new ItemStack(net.minecraft.registry.Registries.ITEM.get(identifier)));
+      paragraphX = 213;
+    }
+    paragraph(
+        count > 0
+            ? count
+                + " × "
+                + (id.equals("cobblemon:blank_tm")
+                    ? data.ui("baron.blank_tm")
+                    : data.name("item", id))
+            : label);
+    paragraphX = 195;
+  }
+
+  private void renderBarons(DrawContext c, int mx, int my) {
+    String[] pages = {"info", "loot", "tms"};
+    for (int i = 0; i < pages.length; i++)
+      chip(
+          c,
+          data.ui("baron." + pages[i]),
+          192 + i * 71,
+          227,
+          68,
+          baronPage == i,
+          hit(mx, my, 192 + i * 71, 227, 68, 21),
+          ACCENT);
+    chip(c, "−", 431, 227, 21, false, hit(mx, my, 431, 227, 21, 21), ACCENT);
+    String level = data.ui("baron.level", baronLevel);
+    label(c, level, 457 + (76 - textRenderer.getWidth(level)) / 2, 234, INK);
+    chip(c, "+", 537, 227, 21, false, hit(mx, my, 537, 227, 21, 21), ACCENT);
+  }
+
   private String eggGroup(String id) {
     return switch (id.toLowerCase(Locale.ROOT).replace(" ", "").replace("-", "")) {
       case "monster" -> data.ui("egg.monster");
@@ -482,15 +676,19 @@ public final class WikiScreen extends InstrumentScreen {
   }
 
   private boolean hasMoveSearch() {
-    return tab == 2 || tab == 4;
+    return tab == 2 || tab == 4 || tab == 7 && baronPage == 2;
   }
 
   private int visibleDetailRows() {
-    return hasMoveSearch() || tab == 6 ? 7 : DETAIL_ROWS;
+    return tab == 7 && hasMoveSearch() ? 6 : hasMoveSearch() || tab >= 6 ? 7 : DETAIL_ROWS;
   }
 
   private int detailY() {
-    return hasMoveSearch() || tab == 6 ? 252 : 230;
+    return tab == 7 && hasMoveSearch() ? 271 : hasMoveSearch() || tab >= 6 ? 252 : 230;
+  }
+
+  private int searchY() {
+    return tab == 7 ? 249 : 227;
   }
 
   private void move(String origin, MoveTemplate move) {
@@ -642,8 +840,8 @@ public final class WikiScreen extends InstrumentScreen {
         chip(c, "‹", 187, 173, 21, false, hit(mx, my, 187, 173, 21, 21), ACCENT);
         chip(c, "›", 271, 173, 21, false, hit(mx, my, 271, 173, 21, 21), ACCENT);
       }
-      chip(
-          c, data.ui("tab.habitat"), 389, 55, 134, tab == 6, hit(mx, my, 389, 55, 134, 21), ACCENT);
+      chip(c, data.ui("tab.habitat"), 449, 55, 74, tab == 6, hit(mx, my, 449, 55, 74, 21), ACCENT);
+      chip(c, data.ui("baron.tab"), 389, 55, 57, tab == 7, hit(mx, my, 389, 55, 57, 21), ACCENT);
       for (int i = 0; i < TABS.length; i++)
         chip(
             c,
@@ -656,12 +854,15 @@ public final class WikiScreen extends InstrumentScreen {
             ACCENT);
       c.fill(187, 224, 565, 341, 0xFFE2F1E5);
       if (tab == 6) renderSpawns(c, mx, my);
+      if (tab == 7) renderBarons(c, mx, my);
       if (hasMoveSearch()) {
-        c.fill(192, 227, 558, 246, moveSearch.isFocused() ? 0xFF398971 : 0xFF83AF99);
-        c.fill(193, 228, 557, 245, PANEL);
+        c.fill(
+            192, searchY(), 558, searchY() + 19, moveSearch.isFocused() ? 0xFF398971 : 0xFF83AF99);
+        c.fill(193, searchY() + 1, 557, searchY() + 18, PANEL);
         moveSearch.render(c, mx, my, delta);
         if (!moveSearch.getText().isEmpty())
-          label(c, "×", 547, 232, hit(mx, my, 544, 227, 14, 19) ? 0xFFFF777A : WHITE);
+          label(
+              c, "×", 547, searchY() + 5, hit(mx, my, 544, searchY(), 14, 19) ? 0xFFFF777A : WHITE);
       }
       for (int i = 0; i < visibleDetailRows() && detailOffset + i < lines.size(); i++) {
         int index = detailOffset + i, y = detailY() + i * 12;
@@ -692,6 +893,13 @@ public final class WikiScreen extends InstrumentScreen {
           int r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
           textColor =
               0xFF000000 | ((r * 3 / 5 + 102) << 16) | ((g * 3 / 5 + 102) << 8) | (b * 3 / 5 + 102);
+        }
+        if (itemRows.containsKey(index)) {
+          c.getMatrices().push();
+          c.getMatrices().translate(195, y - 2, 0);
+          c.getMatrices().scale(0.75F, 0.75F, 1);
+          c.drawItem(itemRows.get(index), 0, 0);
+          c.getMatrices().pop();
         }
         label(c, lines.get(index), indents.getOrDefault(index, 195), y, textColor);
       }
@@ -733,6 +941,21 @@ public final class WikiScreen extends InstrumentScreen {
       c.disableScissor();
     }
     List<Text> tooltip = new ArrayList<>();
+    if (tab == 7 && hit(mx, my, 389, 55, 57, 21)) {
+      tooltip.add(Text.literal(data.ui("baron.source")));
+      tooltip.add(Text.literal(data.ui("baron.tm_explain")));
+      tooltip.add(
+          Text.literal(
+              data.ui(
+                  com.cobblemon.mod.common.api.tms.TechnicalMachines.INSTANCE
+                          .getMoveToTM()
+                          .isEmpty()
+                      ? "baron.tm_local"
+                      : "baron.tm_synced")));
+      tooltip.add(Text.literal(data.ui("baron.machine")));
+    }
+    if (tab == 7 && hit(mx, my, 431, 227, 127, 21))
+      tooltip.add(Text.literal(data.ui("baron.level_hint")));
     if (tab == 1 && hit(mx, my, 192, 320, 366, 21))
       tooltip.add(Text.literal(data.ui("evs.source")));
     if (tab == 6 && hit(mx, my, 192, 251, 114, 87) && !spawnEntries.isEmpty())
@@ -764,9 +987,9 @@ public final class WikiScreen extends InstrumentScreen {
       close();
       return true;
     }
-    moveSearch.setFocused(hasMoveSearch() && hit(mx, my, 192, 227, 352, 19));
+    moveSearch.setFocused(hasMoveSearch() && hit(mx, my, 192, searchY(), 352, 19));
     search.setFocused(hit(mx, my, 30, 63, 140, 21));
-    if (hasMoveSearch() && hit(mx, my, 544, 227, 14, 19)) {
+    if (hasMoveSearch() && hit(mx, my, 544, searchY(), 14, 19)) {
       moveSearch.setText("");
       return true;
     }
@@ -798,9 +1021,23 @@ public final class WikiScreen extends InstrumentScreen {
       return true;
     }
     if (selected != null) {
-      if (hit(mx, my, 389, 55, 134, 21)) {
+      if (hit(mx, my, 449, 55, 74, 21)) {
         tab = 6;
         spawnIndex = 0;
+        rebuild();
+        return true;
+      }
+      if (hit(mx, my, 389, 55, 57, 21)) {
+        tab = 7;
+        moveSearch.setFocused(false);
+        rebuild();
+        return true;
+      }
+      if (tab == 7 && hit(mx, my, 192, 227, 366, 21)) {
+        if (mx < 405 && (mx - 192) % 71 < 68) baronPage = (mx - 192) / 71;
+        else if (mx >= 431 && mx < 452)
+          baronLevel = Math.max(1, baronLevel - (hasShiftDown() ? 10 : 1));
+        else if (mx >= 537) baronLevel = Math.min(100, baronLevel + (hasShiftDown() ? 10 : 1));
         rebuild();
         return true;
       }

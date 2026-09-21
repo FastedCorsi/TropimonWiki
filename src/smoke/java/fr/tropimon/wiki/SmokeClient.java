@@ -392,7 +392,7 @@ public final class SmokeClient implements ClientModInitializer {
                 var search =
                     (net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "search");
                 search.setText("#5");
-                click(400, 64);
+                click(480, 64);
                 require((int) field(screen, "tab") == 6, "habitats button opens spawn view");
                 stage = 9;
                 ticks = 0;
@@ -418,6 +418,58 @@ public final class SmokeClient implements ClientModInitializer {
                 require(
                     entries.stream().anyMatch(e -> e.spawn().has("condition")),
                     "wild conditions retained");
+                click(410, 64);
+                stage = 14;
+                ticks = 0;
+              }
+              case 14 -> {
+                if ((boolean) field(screen, "baronLoading")) return;
+                var catalog = (WikiBarons.Catalog) field(screen, "baronCatalog");
+                require(
+                    catalog != null && catalog.knownDrops() && catalog.knownMoves(),
+                    "Alpha local rules recognized");
+                auditBarons(catalog);
+                shot(client, "wiki-barons-info");
+                click(300, 236);
+                require((int) field(screen, "baronPage") == 1, "Alpha loot selected");
+                require(
+                    ((List<String>) field(screen, "lines"))
+                        .stream().anyMatch(l -> l.contains("44,44") || l.contains("44.44")),
+                    "tier 2 weighted candy chances");
+                require(
+                    ((List<String>) field(screen, "lines"))
+                        .stream().anyMatch(l -> l.contains("60,94") || l.contains("60.94")),
+                    "type reward odds include both 50 percent gates");
+                stage = 15;
+                ticks = 0;
+              }
+              case 15 -> {
+                shot(client, "wiki-barons-loot");
+                click(547, 236);
+                require(
+                    (int) field(screen, "baronLevel") == 51, "Alpha tier boundary changes at 51");
+                require(
+                    ((List<String>) field(screen, "lines"))
+                        .stream().anyMatch(l -> l.contains("11,76") || l.contains("11.76")),
+                    "tier 3 candy probability includes empty entry");
+                click(360, 236);
+                require(
+                    (int) field(screen, "baronPage") == 2
+                        && !((Map<?, ?>) field(screen, "moveRows")).isEmpty(),
+                    "Alpha TM recipes displayed");
+                click(250, 257);
+                ((net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch"))
+                    .setText("flamethrower");
+                require(((Map<?, ?>) field(screen, "moveRows")).size() == 1, "Alpha TM search");
+                require(
+                    ((Map<?, ?>) field(screen, "itemRows")).size() == 3,
+                    "blank TM and both crafting ingredients");
+                stage = 16;
+                ticks = 0;
+              }
+              case 16 -> {
+                shot(client, "wiki-barons-tm");
+                click(550, 257);
                 stage = 10;
                 ticks = 0;
               }
@@ -478,6 +530,24 @@ public final class SmokeClient implements ClientModInitializer {
               }
               case 12 -> {
                 shot(client, "wiki-gui-stats-" + testedScale);
+                click(410, 64);
+                click(360, 236);
+                click(250, 257);
+                ((net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch"))
+                    .setText("flamethrower");
+                require(
+                    ((net.minecraft.client.gui.widget.TextFieldWidget) field(screen, "moveSearch"))
+                        .isFocused(),
+                    "Alpha search hitbox GUI " + testedScale);
+                screen.resize(client, screen.width, screen.height);
+                stage = 17;
+                ticks = 0;
+              }
+              case 17 -> {
+                shot(client, "wiki-gui-barons-" + testedScale);
+                click(550, 257);
+                scroll(400, 300, -1);
+                require((int) field(screen, "detailOffset") > 0, "Alpha scroll GUI " + testedScale);
                 if (++testedScale <= 4) {
                   stage = 10;
                   ticks = 0;
@@ -495,6 +565,99 @@ public final class SmokeClient implements ClientModInitializer {
             stage = 99;
           }
         });
+  }
+
+  void auditBarons(WikiBarons.Catalog catalog) throws Exception {
+    require(catalog.loot().size() == 40, "all 40 Alpha reward tables present");
+    for (var table : catalog.loot().values())
+      for (var pool : WikiBaronRules.pools(table))
+        require(
+            Math.abs(pool.drops().stream().mapToDouble(WikiBaronRules.Drop::probability).sum() - 1)
+                < 1e-9,
+            "Alpha loot pool normalized");
+    var runtime = com.bedrockk.molang.MoLang.createRuntime();
+    com.cobblemon.mod.common.api.molang.MoLangFunctions.INSTANCE.addStandardFunctions(
+        runtime.getEnvironment().query);
+    var root =
+        net.fabricmc.loader.api.FabricLoader.getInstance()
+            .getModContainer("cobblemon")
+            .orElseThrow()
+            .findPath("data/cobblemon/callbacks/battle_fainted/pokemon_alpha_drops.molang")
+            .orElseThrow();
+    String callback = Files.readString(root);
+    String branch =
+        callback.substring(
+            callback.indexOf("t.types[0]"), callback.indexOf("(math.random_integer"));
+    String actual =
+        runtime
+            .execute(
+                com.bedrockk.molang.MoLang.parse(
+                    "t.pokemon_types = q.array('fire', 'flying'); t.pokemon.level = 50; "
+                        + branch
+                        + " return t.types[1];"))
+            .asString();
+    require(actual.equals("fire"), "actual Alpha callback repeats primary type for dual types");
+    require(
+        !WikiBarons.alpha("charmander held_item=cobblemon:fire_gem")
+            && WikiBarons.alpha("charizard alpha=true"),
+        "boss followers are not Alphas");
+    for (String name : List.of("charizard", "magikarp", "eevee")) {
+      var species = com.cobblemon.mod.common.api.pokemon.PokemonSpecies.INSTANCE.getByName(name);
+      var form = species.getStandardForm();
+      var entries = WikiBarons.machines(catalog, form, 50);
+      require(
+          entries.stream()
+              .allMatch(e -> Double.isFinite(e.chance()) && e.chance() >= 0 && e.chance() <= 1),
+          "TM probabilities valid: " + name);
+      require(
+          entries.stream().noneMatch(WikiBarons.TM::local),
+          "TM recipes use loaded registry: " + name);
+      var manager =
+          new com.cobblemon.mod.common.api.tms.TMMoveManager(
+              new java.util.UUID(0, 2), new HashSet<>());
+      for (int sample = 0; sample < 20; sample++) {
+        var pokemon =
+            com.cobblemon.mod.common.api.pokemon.PokemonProperties.Companion.parse(
+                    name + " level=50 alpha=true")
+                .create();
+        var nativeRecipes = manager.getLearnableTMsFromPokemon(pokemon);
+        require(
+            entries.stream()
+                .filter(e -> e.chance() == 1)
+                .allMatch(e -> nativeRecipes.contains(e.machine().getId())),
+            "guaranteed recipes agree with native capture resolver: " + name);
+        require(
+            nativeRecipes.stream()
+                .allMatch(id -> entries.stream().anyMatch(e -> e.machine().getId().equals(id))),
+            "native capture recipes covered: " + name);
+      }
+      var level = form.getMoves().getLevelUpMovesUpTo(50);
+      var pool =
+          form.getMoves().getTmMoves().stream().filter(m -> !level.contains(m)).distinct().toList();
+      if (pool.size() < 3) continue;
+      var predicted =
+          WikiBaronRules.twoChoices(
+              pool.stream().mapToDouble(m -> m.getSelectionWeight(form)).toArray());
+      var observed = new HashMap<com.cobblemon.mod.common.api.moves.MoveTemplate, Integer>();
+      int samples = 12000;
+      for (int i = 0; i < samples; i++) {
+        var chosen = new HashSet<com.cobblemon.mod.common.api.moves.MoveTemplate>();
+        for (int slot = 0; slot < 2; slot++) {
+          var move =
+              com.cobblemon.mod.common.api.moves.MoveSelector.Companion.getTM()
+                  .invoke(form, form.getMoves(), 50, chosen);
+          if (move != null) {
+            chosen.add(move);
+            observed.merge(move, 1, Integer::sum);
+          }
+        }
+      }
+      for (int i = 0; i < pool.size(); i++)
+        require(
+            Math.abs(observed.getOrDefault(pool.get(i), 0) / (double) samples - predicted[i])
+                < .025,
+            "native weighted TM selector agrees: " + pool.get(i).getName());
+    }
   }
 
   void auditEvYields(MinecraftClient client) {
