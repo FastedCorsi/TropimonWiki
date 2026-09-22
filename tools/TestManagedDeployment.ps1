@@ -75,4 +75,4 @@ foreach ($installer in @((Join-Path $PSScriptRoot 'InstallManagedLocalMod.ps1'))
     Run-Installer 'blocked'
     Assert ((Get-FileHash -LiteralPath $imported).Hash -eq $hash) 'Blocked installs preserve imported copy'
 }
-Write-Output 'External managed delivery transactions passed; Java updater is covered by UpdaterSafetyTest.'
+Write-Output 'External managed delivery transactions passed.'

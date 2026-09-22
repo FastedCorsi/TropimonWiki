@@ -75,7 +75,25 @@ val testManagedDelivery by tasks.registering(Exec::class) {
     commandLine("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
         file("tools/TestManagedDeployment.ps1").absolutePath, "-Jar", tasks.remapJar.get().archiveFile.get().asFile.absolutePath)
 }
-tasks.check { dependsOn(privacyCheck, testLocalDelivery, testManagedDelivery) }
+val verifyNoEmbeddedUpdater by tasks.registering {
+    dependsOn(tasks.remapJar)
+    doLast {
+        val forbidden = listOf("TropimonSelfUpdater", "TropimonUpdateInstaller", "tropimonupdates",
+            "api.github.com/repos/", "tropimon-consent-updater:", "java/lang/ProcessBuilder")
+        ZipFile(tasks.remapJar.get().archiveFile.get().asFile).use { zip ->
+            for (entry in zip.entries().asSequence().filterNot { it.isDirectory }) {
+                check(!entry.name.endsWith(".ps1") && !entry.name.endsWith(".exe")) {
+                    "Local installation tools must stay outside the runtime JAR."
+                }
+                val body = zip.getInputStream(entry).use { it.readBytes().toString(Charsets.ISO_8859_1) }
+                check(forbidden.none { entry.name.contains(it) || body.contains(it) }) {
+                    "Embedded updater detected in ${entry.name}."
+                }
+            }
+        }
+    }
+}
+tasks.check { dependsOn(privacyCheck, verifyNoEmbeddedUpdater, testLocalDelivery, testManagedDelivery) }
 tasks.register("prepareReleaseDelivery") {
     dependsOn(tasks.build)
     doLast {

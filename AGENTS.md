@@ -1,12 +1,5 @@
 # Confidentialité permanente des mods Tropimon
 
-## Instance du launcher et données du Wiki
-
-- Le programme du launcher et ses données peuvent être séparés. Détecter le profil actif avant une installation ; le dossier mods historique peut être un miroir et ne prouve pas quels JAR sont chargés.
-- À l'exécution, utiliser l'origine du ModContainer Fabric pour identifier le JAR chargé et dériver son dossier mods et son instance. Vérifier le JAR et son SHA-256 dans cette instance avant d'annoncer une installation réussie.
-- Afficher les talents par couleur et expliquer leur effet au survol dans la langue du joueur, sans badge de statut ni onglet Talents. Classer les talents à partir de leur statut explicite, jamais de leur ordre ou de leur nombre. Un talent unique, y compris un doublon normal/caché de même nom, ne doit pas être présenté comme un HA distinct.
-- Présenter les évolutions avec leur méthode et toutes leurs conditions. Conserver les conditions inconnues plutôt que de les ignorer. Documenter le repli local sans bandeau technique dans la fiche, conformément à la demande utilisateur.
-
 Cette règle demandée par l'utilisateur s'applique à toute création, correction, optimisation, compilation et livraison des mods Tropimon de ce dépôt, y compris leurs futurs modules.
 
 ## Attribution et données du développeur
@@ -48,7 +41,7 @@ Cette règle demandée par l'utilisateur s'applique à toute création, correcti
 - Les mods doivent rester compatibles avec les mises à jour mineures de Cobblemon sans exiger une recompilation à chaque fois. Déclarer une version minimale réellement prise en charge, sans borne maximale mineure artificielle ; une rupture majeure ou une incompatibilité réelle peut justifier une borne documentée.
 - Compiler et tester chaque livraison contre le JAR Cobblemon actuellement installé et, lorsque le mod appelle directement son API, contre la version minimale annoncée. Utiliser l'API commune ou un petit adaptateur local pour les écarts réels ; ne pas dépendre des classes internes de nos autres mods.
 - Le build doit refuser une ancienne borne de métadonnées et sélectionner automatiquement l'unique JAR Cobblemon actif, avec une option explicite pour la matrice de compatibilité. Vérifier la dépendance dans les deux JAR finaux.
-- Chaque mod conserve son auto-update autonome : dépôt officiel propre, empreinte vérifiée et remplacement différé après arrêt de Minecraft. Il complète la compatibilité générique et ne la remplace pas.
+- La compatibilité reste assurée par le code et les tests, indépendamment des notifications Modrinth. Aucun auto-updater intégré ne doit remplacer ces contrôles.
 
 ## Code simple, lisible et efficace
 
@@ -71,12 +64,13 @@ Cette règle demandée par l'utilisateur s'applique à toute création, correcti
 
 
 
-## Dépôts publics et auto-update autonome
+## Dépôts publics et distribution Modrinth
 
 - Chaque mod livré possède son dépôt GitHub public propre. Chaque version validée est poussée, taguée et publiée dans une Release avec exactement un JAR partageable et son fichier SHA-256 ; les livrables LOCAL et les données propres à une machine ne sont jamais publiés.
-- Chaque mod embarque une copie autonome et légère de son système de mise à jour, dans son propre package. Aucun mod ne dépend des classes ou du service de mise à jour d'un autre mod Tropimon.
-- L'updater accepte uniquement la Release officielle du dépôt du mod, vérifie le SHA-256 puis l'identifiant et la version de fabric.mod.json. Il prépare hors du dossier mods, attend l'arrêt de Minecraft sans fermer le launcher, conserve une sauvegarde hors des mods chargés et n'écrase jamais une cible modifiée depuis la préparation.
-- Conserver une vérification asynchrone espacée, sans travail par tick ou par frame. Une livraison de code doit mettre à jour le dépôt, le tag et la Release correspondants après réussite des contrôles de compatibilité, de tests et de confidentialité.
+- La distribution et les mises à jour destinées aux joueurs passent désormais par les projets officiels Modrinth autorisés. GitHub conserve les sources et livraisons autorisées ; ne pas effacer les anciens dépôts, tags ou releases pour retirer un updater du code.
+- Aucun téléchargement ou remplacement de JAR, helper d'installation, job GitHub d'auto-update ou popup d'installation n'est embarqué dans les nouveaux mods. Ne pas conserver notre auto-installateur en changeant simplement son fournisseur pour Modrinth.
+- La notification éventuelle est autonome, légère, asynchrone et espacée. Aucun travail réseau par tick ou frame, aucune bibliothèque commune ni nouveau launcher obligatoire. Les outils privés d'installation locale restent distincts des fonctionnalités livrées aux joueurs.
+
 
 
 ## Installation locale prise en charge par l’agent
@@ -86,23 +80,68 @@ Cette règle demandée par l'utilisateur s'applique à toute création, correcti
 - Sur ce schéma vérifié, synchroniser la copie importée, la copie chargée et le suivi du seul mod livré. Préserver les autres mods, leurs désactivations et le manifeste officiel ; ne jamais désactiver le contrôle des mods non gérés ni assouplir une protection du launcher.
 - Réutiliser l’installateur local `InstallManagedLocalMod.ps1` lorsqu’il est disponible et en joindre une copie autonome à la livraison LOCAL. Remplacer ou adapter l’ancienne entrée d’installation avant de la lancer sur un profil géré ; un ancien script limité au dossier `mods` ne doit pas être utilisé tel quel. Aucun outil local n’est embarqué dans le JAR partageable, aucune dépendance entre mods n’est ajoutée.
 - Attendre l’arrêt du jeu concerné sans forcer le launcher ni Minecraft. Vérifier les SHA-256, l’identifiant et la version, empêcher doublons et retours de version, sauvegarder hors des dossiers chargés et refuser les cibles modifiées, verrouillées, redirigées ou ambiguës. Une évolution inconnue du format impose une nouvelle vérification, pas une modification forcée.
-- Vérifier les deux copies et l’enregistrement du launcher après installation ; indiquer séparément l’état sur disque et une éventuelle validation en jeu. Les auto-updaters doivent respecter ce stockage géré lorsqu’ils sont adaptés ; une règle ou un installateur local corrigé ne répare pas rétroactivement les JAR déjà distribués.
+- Vérifier les deux copies et l’enregistrement du launcher après installation ; indiquer séparément l’état sur disque et une éventuelle validation en jeu. Retirer l'auto-updater du nouveau code ne le retire pas rétroactivement des JAR déjà distribués. L'installateur local privé ne doit pas être réintroduit dans le JAR public.
 - Ces consignes ne déclenchent pas à elles seules une compilation, une publication ni une modification des mods mis de côté. Tropimon Compagnon reste exclu tant que l’utilisateur demande de ne pas y toucher.
 
 
-## Consentement et mise à jour indépendante du launcher
+## Coordination générale des mods Tropimon
+
+- La tâche intitulée « MANAGEUR » est le point de coordination de tous les mods Tropimon. Les tâches spécialisées par mod conservent leur périmètre ; ce rôle ne les transforme pas toutes en gestionnaire global.
+- Le code, les corrections et les tests propres à un mod sont réalisés dans sa tâche spécialisée. MANAGEUR transmet les demandes et leur contexte, suit les résultats, vérifie les preuves et coordonne les livraisons ; il ne code pas directement dans les mods sans demande explicite contraire de l’utilisateur. En cas de reprise, transmettre les changements existants et leurs limites sans les annuler ni travailler en concurrence.
+- Le gestionnaire centralise l’état des travaux, les problèmes transversaux, les versions et les consignes communes. Avant d’intervenir dans un mod, vérifier le travail en cours dans sa tâche pour éviter doublons et modifications concurrentes.
+- Coordonner la compatibilité, l’indépendance des mods, les performances, la simplicité du code, la confidentialité et l’attribution « By FastedCorsi », sans remplacer les contrôles propres à chaque projet.
+- Prendre en charge les livraisons autorisées : JAR local et partageable, installation locale gérée par le launcher, sauvegardes, vérifications et état réel. Distinguer une version préparée, installée, testée en jeu et publiée ; ne jamais annoncer ces états sans preuve.
+- Ce rôle n’autorise pas à lui seul une nouvelle fonctionnalité, une réécriture générale, une action destructive ou une surveillance en arrière-plan. Respecter les autorisations existantes et les exclusions : Team Hunt et Bid Maker restent en pause ; ne pas toucher à Tropimon Compagnon tant que cette restriction est maintenue.
+
+
+## Consentement et notification Modrinth
 
 - Toute récupération de fichier, y compris JAR, empreinte et catalogue externe, exige un accord éclairé préalable du joueur. Ne jamais télécharger en arrière-plan avant cet accord.
 - La vérification des métadonnées de mise à jour est désactivée sans consentement explicite ; un ancien `enabled: true` généré automatiquement ne vaut pas accord. L'autorisation de vérifier ne vaut jamais autorisation de télécharger ou installer une version.
-- Présenter le mod, la version, la source officielle, les fichiers et le remplacement différé avec sauvegarde avant le bouton de téléchargement. Refuser, reporter ou fermer ne déclenche aucun téléchargement.
-- Chaque mod contient sa propre implémentation. Utiliser le Java existant et le JAR réellement chargé ; ne demander aucune modification du launcher, installation d'un outil ou chemin personnel.
-- Gérer le dossier mods classique et le stockage Tropimon reconnu. Conserver le nom enregistré, synchroniser les deux copies et préserver le suivi ainsi que les autres mods. Une disposition inconnue doit bloquer proprement, sans contourner une protection du launcher.
-- Tester le helper réellement exporté : attente de Minecraft, fichiers modifiés/verrouillés, sauvegarde, deux types de stockage et absence de consentement. Ne pas confondre un installateur local validé avec l'updater livré aux joueurs.
+- Le consentement aux anciennes vérifications GitHub n'autorise pas implicitement une nouvelle source Modrinth. Présenter le fournisseur et la nature des requêtes ; refuser ou fermer ne provoque aucune requête. Préserver les consentements distincts des API utiles au jeu.
+- Consulter seulement un projet Modrinth officiel vérifié. Filtrer les versions publiées et compatibles avec Minecraft, Fabric et les dépendances connues ; comparer réellement les versions, sans proposer de retour arrière. Un projet absent, privé, rejeté ou un accès indisponible ne signifie pas qu'une mise à jour existe.
+- Le lien de chat ouvre la page HTTPS de la version officielle, jamais une commande shell, un téléchargement direct de JAR ou un protocole d'installation non vérifié. Aucun remplacement automatique par le mod.
+- Tester absence de réseau sans consentement, version égale/ancienne/incompatible, projet non public, erreur réseau, liens officiels et absence d'installateur dans les artefacts. Ne pas confondre l'installation locale avec une mise à jour gérée par Modrinth.
 
-- Canal de transition : publier les nouvelles releases stables avec `--latest=false` et la mention `<!-- tropimon-consent-updater:2 -->` dans leurs notes. Vérifier après publication que `/releases/latest` reste inchangé ; les anciens updaters non consentis ne doivent pas être déclenchés pour récupérer le correctif. Le nouvel updater sélectionne ce canal dans `/releases?per_page=20`. Une première installation manuelle peut être nécessaire depuis une version ancienne.
+- Transition : les anciennes versions distribuées conservent leur ancien comportement. Ne pas provoquer volontairement leur auto-update par un nouveau marqueur de canal ou par un déplacement de latest. Si une archive GitHub est publiée, préserver le canal historique sans ajouter le marqueur consommé par les anciens updaters ; Modrinth est le canal de mise à jour prévu. Une première mise à jour manuelle peut être nécessaire. Aucune suppression aveugle des configurations, sauvegardes ou fichiers préparés.
+
+## Mise à jour accessible sans commande
+
+- Aucun joueur ne doit taper une commande : après entrée dans un monde, une notification de chat cliquable indique uniquement une mise à jour Modrinth effectivement connue, avec le mod et les versions. Sans accord, un accès facultatif aux préférences peut proposer la vérification sans réseau préalable.
+- Remplacer la popup générale d'installation précédemment demandée par cette notification simple. Éviter répétitions et doublons ; ne pas interrompre une interface ou un combat. Aucun menu ne propose de télécharger ou d'installer un JAR depuis le mod.
+- Une automatisation via un gestionnaire Modrinth existant est envisageable seulement si sa compatibilité avec l'instance réelle est démontrée, sans installation contraignante ni modification forcée du launcher. À défaut, conserver le lien vers Modrinth et l'import géré normal du launcher, sans recréer un auto-installateur.
 
 ## Lisibilité aux quatre échelles GUI
 
 - Gérer les échelles Minecraft 1, 2, 3 et 4 sans modifier le réglage global du joueur. Vérifier aussi les fenêtres réduites et le redimensionnement ; distinguer l'échelle demandée de celle réellement appliquée par Minecraft.
 - Conserver des textes, valeurs, contrôles et infobulles lisibles. Adapter l'agencement et le défilement à l'espace disponible ; ne pas masquer une valeur essentielle ou remplacer sa lecture par une police minuscule.
 - Rendu, clics, survol, glisser-déposer et découpe utilisent la même transformation. Contrôler les interactions et protections existantes, pas seulement une capture à l'échelle 2. Les mods restent indépendants, avec une implémentation locale simple.
+
+## Parcours des tests en jeu
+
+- Pour les essais manuels et visuels, passer par le launcher Tropimon : cliquer sur Jouer, puis sur Solo et entrer dans un monde solo de test. Utiliser les mods réellement installés dans cette instance pour reproduire le parcours utilisateur.
+- Les tests automatisés et clients isolés restent complémentaires ; ne pas les présenter comme une validation de ce parcours dans le launcher.
+- Un essai en solo ne valide pas les fonctions dépendantes du serveur Tropimon. Indiquer séparément les comportements contrôlés en solo et ceux restant à vérifier sur le serveur.
+- Pour tester la notification Modrinth, vérifier le consentement, le message et son lien avec le launcher réel. Le parcours ne lève jamais une interdiction explicite d'installation et ne justifie pas de modifier le launcher. Les essais historiques d'auto-update ne sont pas une preuve du nouveau fonctionnement.
+
+## Distribution fusionnée : nouveau Tropimon Compagnion
+
+- Le nouveau Tropimon Compagnion est distinct de l'ancien Compagnon. Son périmètre initial autorisé réunit Damage Calculator, Wiki, Team Builder, Better PC, Catch Preview, Chat Filter, Events et UI Battle dans un seul mod, un seul identifiant Fabric et un seul JAR distribué.
+- Les évolutions et corrections des modules continuent dans leurs tâches spécialisées habituelles. La tâche Compagnion intègre des révisions identifiées et validées dans son propre projet, sans modifier en concurrence les sources originales ni copier un état de travail incertain. MANAGEUR coordonne les versions à intégrer et les preuves.
+- Pour ces huit modules, la distribution des nouvelles évolutions passe par Compagnion : un seul projet de distribution Modrinth et une seule version de l'ensemble, sans updater intégré. Cette consigne remplace la publication et l'installation automatiques de JAR individuels pour ces évolutions ; leurs sources et artefacts de validation peuvent rester séparés. Ne pas supprimer les dépôts, anciennes releases ou fichiers personnels pour appliquer ce changement.
+- Le message de chat signale une version de Compagnion comme ensemble. L'activation ou la configuration d'une fonctionnalité intégrée ne constitue pas une mise à jour partielle de son ancien JAR. Ne pas embarquer les huit anciens updaters ni leurs notifications individuelles dans le JAR fusionné.
+- Les mods hors de ce périmètre ne sont pas ajoutés implicitement à Compagnion et conservent leur autonomie. Team Hunt et Bid Maker restent en pause. La coopération avec d'autres mods pour une éventuelle fenêtre commune ne doit pas imposer Compagnion comme dépendance.
+- La livraison de Compagnion conserve les deux exemplaires LOCAL et partageable, les contrôles de confidentialité, de compatibilité, les sauvegardes et le suivi exact des états. Sa migration doit éviter le double chargement des huit anciens mods en préservant leurs réglages et sauvegardes ; aucune suppression aveugle ni contournement d'une interdiction ponctuelle d'installation pour un test en cours.
+
+## Instance du launcher et données du Wiki
+
+- Le programme du launcher et ses données peuvent être séparés. Détecter le profil actif avant une installation ; le dossier mods historique peut être un miroir et ne prouve pas quels JAR sont chargés.
+- À l'exécution, utiliser l'origine du ModContainer Fabric pour identifier le JAR chargé et dériver son dossier mods et son instance. Vérifier le JAR et son SHA-256 dans cette instance avant d'annoncer une installation réussie.
+- Afficher les talents par couleur et expliquer leur effet au survol dans la langue du joueur, sans badge de statut ni onglet Talents. Classer les talents à partir de leur statut explicite, jamais de leur ordre ou de leur nombre. Un talent unique, y compris un doublon normal/caché de même nom, ne doit pas être présenté comme un HA distinct.
+- Présenter les évolutions avec leur méthode et toutes leurs conditions. Conserver les conditions inconnues plutôt que de les ignorer. Documenter le repli local sans bandeau technique dans la fiche, conformément à la demande utilisateur.
+
+## Transition du Wiki vers Compagnion
+
+- Ce dépôt maintient les sources du module Wiki. Transmettre une révision identifiée et validée à MANAGEUR et à la tâche Compagnion ; ne pas modifier leur projet en parallèle.
+- Aucun updater ni vérificateur Modrinth individuel actif dans le Wiki. Compagnion porte seul la notification de version du package.
+- Les JAR produits ici sont des artefacts internes de validation : pas de Release autonome, installation ou armement automatique pour cette transition. Les outils privés LOCAL restent séparés du code livré aux joueurs.
